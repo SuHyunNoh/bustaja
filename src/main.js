@@ -23,6 +23,10 @@ import { renderChallengeEntryScreen } from "./screens/ChallengeEntryScreen.js";
 
 class App {
   constructor() {
+    const loader = document.getElementById("static-loading-screen");
+    if (loader && loader.parentNode) {
+      loader.parentNode.removeChild(loader);
+    }
     this.appContainer = document.getElementById("app-container");
     if (this.appContainer) {
       this.appContainer.innerHTML = "";
