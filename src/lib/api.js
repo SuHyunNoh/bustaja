@@ -291,13 +291,26 @@ export function getBoardByRouteAndDiff(routeId, diffKey = "easy") {
   };
 }
 
+import { fetchBoardDirectFromSupabase } from "./supabase.js";
+
 // 노선 x 난이도별 점령자 & 랭킹 조회 (Supabase DB 100% 직통 쿼리 비동기)
 export async function getBoardByRouteAndDiffAsync(routeId, diffKey = "easy") {
+  // 1차 Supabase DB scores 테이블 Direct SELECT 쿼리
+  try {
+    const sbBoard = await fetchBoardDirectFromSupabase(routeId, diffKey);
+    if (sbBoard) {
+      console.log("[Supabase Direct Query Success]", sbBoard);
+      return sbBoard;
+    }
+  } catch (e) {
+    console.warn("[Supabase Direct Query Fail]", e);
+  }
+
+  // 2차 퍼블릭 DB 싱크 보완
   try {
     await syncCloudBoardsToLocal();
-  } catch (e) {
-    // 네트워크 실패 시 로컬 반환
-  }
+  } catch (e) {}
+
   return getBoardByRouteAndDiff(routeId, diffKey);
 }
 
