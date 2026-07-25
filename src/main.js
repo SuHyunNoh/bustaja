@@ -48,20 +48,32 @@ class App {
   }
 
   init() {
-    initGA();
-    initKakaoSDK();
-    initSupabase();
-    this.updateHeader();
+    try {
+      if (typeof initGA === "function") initGA();
+      if (typeof initKakaoSDK === "function") initKakaoSDK();
+      if (typeof initSupabase === "function") initSupabase();
+    } catch (err) {
+      console.warn("[App SDK Init Non-fatal Warn]", err);
+    }
 
-    // 카카오톡 공유 링크(?c=challengeId) 감지
-    const urlParams = new URLSearchParams(window.location.search);
-    const challengeId = urlParams.get("c");
+    try {
+      this.updateHeader();
 
-    if (challengeId) {
-      this.currentChallengeId = challengeId;
-      this.navigate("challenge_entry");
-    } else {
-      this.navigate("home");
+      const urlParams = new URLSearchParams(window.location.search);
+      const challengeId = urlParams.get("c");
+
+      if (challengeId) {
+        this.currentChallengeId = challengeId;
+        this.navigate("challenge_entry");
+      } else {
+        this.navigate("home");
+      }
+    } catch (err) {
+      console.error("[App Init Fatal Error]", err);
+      // 치명적 에러 발생 시에도 화면 백화 방지 강제 홈 렌더링
+      try {
+        this.navigate("home");
+      } catch (e) {}
     }
   }
 
