@@ -241,7 +241,9 @@ class App {
   }
 }
 
-// Launch App
-document.addEventListener("DOMContentLoaded", () => {
+// Launch App (DOM 준비 상태에 관계없이 100% 즉각 인스턴스 실행)
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => new App());
+} else {
   new App();
-});
+}
