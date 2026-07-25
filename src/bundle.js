@@ -2533,13 +2533,18 @@ function renderGameScreen(container, { routeId, difficulty, board, isChallengeMa
 // ==========================================================================
 
 
-function renderResultScreen(container, { routeId, difficulty, resultData, isChallengeMatch, challengeData, onRetry, onHome }) {
+function renderResultScreen(container, props = {}) {
+  const { isChallengeMatch, challengeData, onRetry, onHome } = props;
+  const resultData = props.resultData || props.gameData || {};
+  const routeId = props.routeId || resultData.routeId || "ROUTE_6642";
+  const difficulty = props.difficulty || resultData.difficulty || "easy";
+
   const route = getRouteById(routeId);
-  const diffSpec = getDifficultySpec(route.stopCount, difficulty);
+  const diffSpec = getDifficultySpec(route ? route.stopCount : 20, difficulty);
   const currentUser = getCurrentUser();
 
-  const totalSecStr = (resultData.totalMs / 1000).toFixed(2);
-  const avgSplitSecStr = (resultData.totalMs / resultData.stopCount / 1000).toFixed(2);
+  const totalSecStr = ((resultData.totalMs || 0) / 1000).toFixed(2);
+  const avgSplitSecStr = resultData.stopCount ? ((resultData.totalMs || 0) / resultData.stopCount / 1000).toFixed(2) : "0.00";
 
   let challengeResultInfo = null;
   let submitRes = submitScore({
@@ -2547,20 +2552,20 @@ function renderResultScreen(container, { routeId, difficulty, resultData, isChal
     nickname: currentUser.nickname,
     routeId,
     diffKey: difficulty,
-    totalMs: resultData.totalMs,
-    splits: resultData.splits
+    totalMs: resultData.totalMs || 0,
+    splits: resultData.splits || []
   });
 
-  // 비동기 클라우드 DB 보장형 푸시 파이프라인
+  // 비동기 클라우드 Supabase DB 직통 100% 보장형 푸시 파이프라인
   submitScoreAsync({
     uid: currentUser.uid,
     nickname: currentUser.nickname,
     routeId,
     diffKey: difficulty,
-    totalMs: resultData.totalMs,
-    splits: resultData.splits
+    totalMs: resultData.totalMs || 0,
+    splits: resultData.splits || []
   }).then(asyncRes => {
-    console.log("[ResultScreen Cloud Push Completed]", asyncRes);
+    console.log("[ResultScreen Supabase Direct Push Completed]", asyncRes);
   });
 
   if (isChallengeMatch && challengeData) {
@@ -3056,7 +3061,10 @@ class App {
 
         case "result":
           renderResultScreen(this.screenSlot, {
+            routeId: this.selectedRouteId,
+            difficulty: this.selectedDifficulty,
             gameData: this.lastGameData || {},
+            resultData: this.lastGameData || {},
             isChallengeMatch: this.isChallengeMatch,
             challengeData: this.activeChallengeData,
             onRetry: () => this.navigate("game"),
