@@ -6,8 +6,9 @@
 import { LOCAL_ROUTES } from "../data/routes.js";
 import { submitScoreToSupabase, fetchAllBoardsFromSupabase, fetchBoardFromSupabase, fetchBoardDirectFromSupabase } from "./supabase.js";
 
-const BOARDS_STORAGE_KEY = "busstop_boards_v2";
-const CHALLENGES_STORAGE_KEY = "busstop_challenges_v2";
+const BOARDS_STORAGE_KEY = "busstop_boards_v3";
+const CHALLENGES_STORAGE_KEY = "busstop_challenges_v3";
+const MIN_VALID_MS = 3000; // 3초 미만은 비정상(유령) 기록으로 간주
 
 // 버스 번호 및 노선 성격에 맞춘 정확한 한국 버스 색상 배지 반환
 // 지선: 초록(green), 간선: 파랑(blue), 광역: 빨강(red), 순환: 노랑(yellow)
@@ -87,46 +88,30 @@ export async function syncCloudBoardsToLocal() {
     if (res && res.ok) {
       const dataList = await res.json();
       if (Array.isArray(dataList)) {
-        // 1. board_id 별로 레코드 그룹화
-        const boardGroups = {};
         dataList.forEach(item => {
           const key = item.board_id;
           if (key && item.nickname) {
-            if (!boardGroups[key]) boardGroups[key] = [];
-            boardGroups[key].push(item);
-          }
-        });
+            // 비정상(유령) 기록 무시: 3초 미만은 클라우드에서도 스킵
+            if (!item.best_ms || item.best_ms < MIN_VALID_MS) return;
 
-        // 2. 각 board_id 별 최단시간 1위 점령자 및 유니크 도전자 수 정밀 계산
-        Object.keys(boardGroups).forEach(key => {
-          const items = boardGroups[key];
-          // 3초 이하 비정상 0초 오염 레코드 자동 필터링!
-          const validItems = items.filter(i => i.best_ms > 3000);
-          if (validItems.length === 0) return;
+            const localItem = localMap[key];
+            const parts = key.split("__");
+            const parsedRouteId = parts[0] || "ROUTE_6642";
+            const parsedDiff = parts[1] || "easy";
 
-          validItems.sort((a, b) => a.best_ms - b.best_ms); // 최단시간 1위 정렬
-          const top1 = validItems[0];
-          const uniqueNicks = new Set(validItems.map(i => i.nickname));
-
-          const localItem = localMap[key];
-          const parts = key.split("__");
-          const parsedRouteId = parts[0] || "ROUTE_6642";
-          const parsedDiff = parts[1] || "easy";
-
-          const isLocalCorrupted = !localItem || !localItem.bestMs || localItem.bestMs <= 3000 || localItem.occupantNick === "버스기사G";
-
-          // 로컬 데이터가 0초 오염이거나 클라우드 기록이 더 빠르면 100% 강제 교체!
-          if (isLocalCorrupted || top1.best_ms <= localItem.bestMs) {
-            localMap[key] = {
-              ...(localItem || {}),
-              routeId: parsedRouteId,
-              difficulty: parsedDiff,
-              occupantNick: top1.nickname,
-              bestMs: top1.best_ms,
-              occupiedSince: top1.created_at || (localItem && localItem.occupiedSince) || new Date().toISOString(),
-              challengerCount: Math.max(uniqueNicks.size, 1),
-              scores: (localItem && localItem.scores) ? localItem.scores : []
-            };
+            const localInvalid = !localItem || !localItem.bestMs || localItem.bestMs < MIN_VALID_MS;
+            if (localInvalid || item.best_ms <= localItem.bestMs || localItem.occupantNick === "미점령 (첫 영주에 도전하세요!)") {
+              // 기존 로컬 보드 데이터를 보존하고 클라우드 점령자 정보만 정밀 갱신!
+              localMap[key] = {
+                ...(localItem || {}),
+                routeId: parsedRouteId,
+                difficulty: parsedDiff,
+                occupantNick: item.nickname,
+                bestMs: item.best_ms,
+                occupiedSince: item.created_at || (localItem && localItem.occupiedSince) || new Date().toISOString(),
+                scores: (localItem && localItem.scores) ? localItem.scores : []
+              };
+            }
           }
         });
       }
