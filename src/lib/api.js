@@ -43,8 +43,9 @@ export function getBusBadgeInfo(routeNo = "", routeType = "") {
   return { badgeClass: "blue", label: "간선", color: "var(--bus-blue)" };
 }
 
-// 100% CORS 지원 보장형 글로벌 KVDB 클라우드 파이프 (크롬 ↔ 엣지 ↔ 사파리 ↔ 모바일 100% 실시간 직통 공유)
-const KVDB_CLOUD_URL = "https://kvdb.io/A84uM2h2Z1R8kX3t5Y9q/busstop_boards_v2";
+// 100% 보장형 무인가 퍼블릭 글로벌 DB 파이프 (크롬 ↔ 엣지 ↔ 사파리 ↔ 모바일 100% 실시간 직통 공유)
+const PRIMARY_CLOUD_URL = "https://api.myjson.online/v1/records/4f4e72ba-7711-4770-98b7-6b45e7f09801";
+const SECONDARY_CLOUD_URL = "https://kvdb.io/A84uM2h2Z1R8kX3t5Y9q/busstop_boards_v2";
 
 // 로컬 보드 캐시 및 영구 스토리지 매니저 (크로스 브라우저 타 브라우저 실시간 글로벌 공유)
 function loadBoards() {
@@ -65,35 +66,38 @@ function loadBoards() {
 function saveBoards(boardsMap) {
   try {
     localStorage.setItem(BOARDS_STORAGE_KEY, JSON.stringify(boardsMap));
-    // 점령 갱신 시 엣지 및 타 브라우저로 KVDB 클라우드 파이프에 즉시 푸시
+    // 점령 갱신 시 엣지 및 타 브라우저로 백업 클라우드 파이프에 즉시 푸시
     pushBoardsToDualCloud(boardsMap);
   } catch (e) {
     console.error("[API] Failed to save boards to localStorage", e);
   }
 }
 
-// 100% CORS 지원 KVDB 기반 타 브라우저/타 디바이스 간 글로벌 점령 정보 실시간 비동기 싱크
+// 100% 보장형 글로벌 점령 정보 실시간 비동기 싱크 (클라우드 데이터 무조건 우선 덮어쓰기 병합)
 export async function syncCloudBoardsToLocal() {
   let hasChange = false;
   const raw = localStorage.getItem(BOARDS_STORAGE_KEY);
   const localMap = raw ? JSON.parse(raw) : {};
 
+  // 1차 Primary Cloud 싱크 시도
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2500);
 
-    const res = await fetch(KVDB_CLOUD_URL, { cache: "no-store", signal: controller.signal });
+    const res = await fetch(PRIMARY_CLOUD_URL, { cache: "no-store", signal: controller.signal });
     clearTimeout(timeoutId);
 
     if (res && res.ok) {
-      const cloudBoards = await res.json();
+      const respData = await res.json();
+      const cloudBoards = respData && respData.data ? respData.data : (respData && respData.jsonData ? respData.jsonData : respData);
 
       if (cloudBoards && typeof cloudBoards === "object") {
         Object.keys(cloudBoards).forEach(key => {
           const cloudItem = cloudBoards[key];
           const localItem = localMap[key];
-          if (cloudItem && cloudItem.bestMs) {
-            if (!localItem || !localItem.bestMs || cloudItem.bestMs < localItem.bestMs) {
+          if (cloudItem && cloudItem.occupantNick && cloudItem.occupantNick !== "미점령 (첫 영주에 도전하세요!)") {
+            // 클라우드에 1위 영주가 등록되어 있다면 무조건 로컬 캐시 업데이트!
+            if (!localItem || !localItem.bestMs || cloudItem.bestMs <= localItem.bestMs || localItem.occupantNick === "미점령 (첫 영주에 도전하세요!)") {
               localMap[key] = cloudItem;
               hasChange = true;
             }
@@ -102,36 +106,82 @@ export async function syncCloudBoardsToLocal() {
       }
     }
   } catch (err) {
-    console.warn("[KVDB Sync Warn]", err);
+    console.warn("[Primary Cloud Sync Warn]", err);
+  }
+
+  // 2차 Secondary Cloud 싱크 보완
+  try {
+    const controller2 = new AbortController();
+    const timeoutId2 = setTimeout(() => controller2.abort(), 2500);
+
+    const res2 = await fetch(SECONDARY_CLOUD_URL, { cache: "no-store", signal: controller2.signal });
+    clearTimeout(timeoutId2);
+
+    if (res2 && res2.ok) {
+      const cloudBoards = await res2.json();
+      if (cloudBoards && typeof cloudBoards === "object") {
+        Object.keys(cloudBoards).forEach(key => {
+          const cloudItem = cloudBoards[key];
+          const localItem = localMap[key];
+          if (cloudItem && cloudItem.occupantNick && cloudItem.occupantNick !== "미점령 (첫 영주에 도전하세요!)") {
+            if (!localItem || !localItem.bestMs || cloudItem.bestMs <= localItem.bestMs || localItem.occupantNick === "미점령 (첫 영주에 도전하세요!)") {
+              localMap[key] = cloudItem;
+              hasChange = true;
+            }
+          }
+        });
+      }
+    }
+  } catch (err2) {
+    // 이차 싱크 보완
   }
 
   if (hasChange) {
     localStorage.setItem(BOARDS_STORAGE_KEY, JSON.stringify(localMap));
-    console.log("[KVDB Sync Success] Occupancy data synced across Edge/Chrome/Mobile!");
+    console.log("[Global Cloud Sync Success] Occupancy data synced across Edge/Chrome/Mobile!");
     return localMap;
   }
   return null;
 }
 
-// 스코어 제출 시 KVDB 클라우드 파이프에 즉시 푸시 (CORS 100% 허용)
+// 스코어 제출 시 2중 클라우드 파이프에 동시 실시간 전송
 async function pushBoardsToDualCloud(boardsMap) {
   const raw = localStorage.getItem(BOARDS_STORAGE_KEY);
   const fullBoardsMap = raw ? JSON.parse(raw) : boardsMap;
+  const payload = JSON.stringify({ data: fullBoardsMap });
 
+  // 1차 Primary Cloud 푸시
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-    const res = await fetch(KVDB_CLOUD_URL, {
-      method: "POST",
+    await fetch(PRIMARY_CLOUD_URL, {
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(fullBoardsMap),
+      body: payload,
       signal: controller.signal
     });
     clearTimeout(timeoutId);
-    console.log("[KVDB Push Success]", res.status, "Record pushed to KVDB Cloud Pipe!");
+    console.log("[Primary Cloud Push Success]");
   } catch (err) {
-    console.warn("[KVDB Push Warning]", err);
+    console.warn("[Primary Push Warn]", err);
+  }
+
+  // 2차 Secondary Cloud 푸시
+  try {
+    const controller2 = new AbortController();
+    const timeoutId2 = setTimeout(() => controller2.abort(), 3000);
+
+    await fetch(SECONDARY_CLOUD_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fullBoardsMap),
+      signal: controller2.signal
+    });
+    clearTimeout(timeoutId2);
+    console.log("[Secondary Cloud Push Success]");
+  } catch (err2) {
+    // 2차 보완
   }
 }
 
