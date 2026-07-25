@@ -1,0 +1,788 @@
+/* ==========================================================================
+   버스정류장 땅따먹기 — 레트로 픽셀 아트 게임 UI 레이아웃 CSS (v3.0)
+   ========================================================================== */
+
+/* 헤더 HUD (황금빛 상단 배너 - 스티키 고정) */
+.app-header {
+  height: 60px;
+  min-height: 60px;
+  background: linear-gradient(180deg, #fde047 0%, #facc15 100%);
+  border-bottom: 4px solid #110e17;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.4);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  flex-shrink: 0;
+}
+
+.app-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #1c1917;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.8);
+  cursor: pointer;
+}
+
+.user-status-pill {
+  background-color: #1e1b24;
+  color: var(--pixel-yellow);
+  border: 2px solid #110e17;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 #110e17;
+}
+
+.user-status-pill:hover {
+  border-color: var(--pixel-yellow);
+}
+
+/* 화면 컨테이너 (단일 스크롤 스트림: overflow visible + 넉넉한 하단 여백) */
+.screen-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 16px 60px 16px;
+  overflow: visible;
+  position: relative;
+}
+
+/* 1. 홈 화면 (HomeScreen) */
+.home-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: max-content;
+  text-align: center;
+  gap: 16px;
+  padding-bottom: 40px;
+}
+
+.hero-section {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.game-title-lg {
+  font-size: 28px;
+  color: var(--pixel-yellow);
+  text-shadow: 3px 3px 0 #110e17, 0 0 12px rgba(250, 204, 21, 0.4);
+  margin-bottom: 4px;
+  line-height: 1.25;
+}
+
+.game-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+/* 도트 그래픽 스테이지 (도로 & 버스 정류장) */
+.pixel-stage {
+  width: 100%;
+  height: 170px;
+  background-color: #1a2238;
+  border: 4px solid #110e17;
+  border-radius: 8px;
+  box-shadow: var(--pixel-shadow);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.stage-road {
+  width: 100%;
+  height: 44px;
+  background-color: #334155;
+  border-top: 4px solid #110e17;
+  position: relative;
+}
+
+.stage-road-line {
+  position: absolute;
+  top: 50%;
+  width: 100%;
+  height: 4px;
+  background: dashed repeat-x;
+  border-top: 3px dashed #94a3b8;
+}
+
+.pixel-bus-animated {
+  position: absolute;
+  bottom: 25px;
+  left: 20%;
+  width: 72px;
+  height: 42px;
+  background: var(--bus-blue);
+  border: 3px solid #110e17;
+  border-radius: 6px;
+  box-shadow: 3px 3px 0 #110e17;
+}
+
+.pixel-bus-window {
+  width: 48px;
+  height: 14px;
+  background: #7dd3fc;
+  border: 2px solid #110e17;
+  margin: 4px auto 0 auto;
+}
+
+.pixel-bus-wheel-1, .pixel-bus-wheel-2 {
+  width: 12px;
+  height: 12px;
+  background: #110e17;
+  border-radius: 50%;
+  position: absolute;
+  bottom: -6px;
+}
+.pixel-bus-wheel-1 { left: 8px; }
+.pixel-bus-wheel-2 { right: 8px; }
+
+.pixel-stop-post {
+  position: absolute;
+  bottom: 25px;
+  right: 25%;
+  width: 6px;
+  height: 64px;
+  background: #64748b;
+  border: 2px solid #110e17;
+}
+
+.pixel-stop-sign {
+  position: absolute;
+  top: -12px;
+  left: -20px;
+  width: 46px;
+  height: 24px;
+  background: var(--bus-red);
+  border: 2px solid #110e17;
+  color: #fff;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  border-radius: 3px;
+}
+
+.pixel-flag {
+  position: absolute;
+  top: -30px;
+  left: 0;
+  font-size: 20px;
+}
+
+/* 핫 노선 박스 (지금 가장 치열한 땅따먹기 노선 TOP 5) */
+.hot-routes-box {
+  background: var(--pixel-bg-card-light);
+  border: 3px solid #110e17;
+  box-shadow: var(--pixel-shadow);
+  padding: 14px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+.hot-route-item {
+  background: var(--pixel-bg-input);
+  border: 2px solid #110e17;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.hot-route-item:hover {
+  transform: translateY(-2px);
+  border-color: var(--pixel-yellow);
+  box-shadow: var(--pixel-shadow-sm);
+}
+
+.hot-route-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hot-rank-badge {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--pixel-yellow);
+  min-width: 32px;
+}
+
+.hot-route-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hot-route-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hot-route-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.hot-fight-status {
+  font-size: 11px;
+  background: rgba(250, 204, 21, 0.15);
+  color: var(--pixel-yellow);
+  border: 1px dashed var(--pixel-yellow);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+/* 2. 노선 검색 화면 */
+.search-bar-wrapper {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.pixel-input {
+  flex: 1;
+  font-family: var(--font-pixel);
+  font-size: 15px;
+  background-color: var(--pixel-bg-input);
+  color: #ffffff;
+  border: 3px solid #110e17;
+  border-radius: 6px;
+  padding: 12px;
+  outline: none;
+  box-shadow: inset 2px 2px 4px rgba(0,0,0,0.6);
+}
+
+.pixel-input:focus {
+  border-color: var(--pixel-yellow);
+}
+
+.route-card {
+  background: var(--pixel-bg-card-light);
+  border: 3px solid #110e17;
+  box-shadow: var(--pixel-shadow-sm);
+  border-radius: 6px;
+  padding: 14px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.route-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--pixel-shadow);
+  border-color: var(--pixel-yellow);
+}
+
+.route-card.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #1e1b24;
+}
+
+.route-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.route-number {
+  font-size: 18px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.route-stops-info {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+}
+
+.exclusion-notice {
+  font-size: 11px;
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px dashed var(--danger);
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+/* 3. 노선 상세 & 난이도 탭 */
+.difficulty-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  background-color: var(--pixel-bg-input);
+  border: 3px solid #110e17;
+  border-radius: 6px;
+  padding: 4px;
+}
+
+.diff-tab {
+  flex: 1;
+  font-family: var(--font-pixel);
+  font-size: 13px;
+  padding: 10px 4px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-align: center;
+  border-radius: 4px;
+  transition: all 0.1s ease;
+}
+
+.diff-tab.active {
+  background: linear-gradient(180deg, #fde047 0%, #facc15 100%);
+  color: #1c1917;
+  border: 2px solid #110e17;
+  box-shadow: var(--pixel-shadow-sm);
+  font-weight: bold;
+}
+
+.occupant-banner {
+  background: linear-gradient(135deg, #372a4d 0%, #221a33 100%);
+  border: 3px solid var(--pixel-yellow);
+  box-shadow: 0 0 16px rgba(250, 204, 21, 0.3);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.occupant-title {
+  font-size: 12px;
+  color: var(--pixel-yellow);
+  margin-bottom: 4px;
+}
+
+.occupant-name {
+  font-size: 22px;
+  color: #ffffff;
+  text-shadow: 2px 2px 0 #110e17;
+  margin-bottom: 6px;
+}
+
+.occupant-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.days-occupied-badge {
+  background: var(--pixel-yellow);
+  color: #1c1917;
+  font-weight: bold;
+  padding: 2px 6px;
+  border: 1px solid #110e17;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.ghost-select-box {
+  margin-bottom: 16px;
+}
+
+/* 랭킹 내 내부 스크롤 박스 (4등 이상 등록 시 버튼 잘림 완벽 방지) */
+.leaderboard-scrollbox {
+  max-height: 160px;
+  overflow-y: auto;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 하단 주 액션 버튼 스티키 고정 패널 */
+.sticky-action-footer {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(180deg, rgba(40,36,54,0.7) 0%, rgba(40,36,54,0.98) 40%);
+  backdrop-filter: blur(6px);
+  padding: 12px 0 16px 0;
+  margin-top: 12px;
+  z-index: 20;
+}
+
+/* 구글 애드센스 / 카카오 애드핏 시내버스 디스플레이 광고 영역 */
+.ad-banner-slot {
+  width: 100%;
+  background: #191624;
+  border: 2px dashed #4b4263;
+  border-radius: 6px;
+  padding: 8px;
+  text-align: center;
+  margin: 10px 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.result-ad-box {
+  width: 100%;
+  background: #171421;
+  border: 3px solid #110e17;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 14px;
+  text-align: center;
+  box-shadow: var(--pixel-shadow-sm);
+}
+
+/* 4. 게임 화면 (GameScreen) */
+.game-hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--pixel-bg-input);
+  border: 3px solid #110e17;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+
+.timer-display {
+  font-size: 22px;
+  font-weight: bold;
+  color: var(--pixel-mint);
+  text-shadow: 1px 1px 0 #110e17;
+}
+
+.ghost-delta-badge {
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 2px solid #110e17;
+  border-radius: 4px;
+  background: #2b253b;
+  font-weight: bold;
+}
+.ghost-delta-badge.ahead { color: var(--pixel-mint); border-color: var(--pixel-mint); }
+.ghost-delta-badge.behind { color: var(--danger); border-color: var(--danger); }
+
+/* 수평 트랙 프로그레스 */
+.race-track-container {
+  background: var(--pixel-bg-card-light);
+  border: 3px solid #110e17;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.track-line {
+  height: 12px;
+  background: #15131d;
+  border: 2px solid #110e17;
+  border-radius: 6px;
+  position: relative;
+  margin: 18px 0;
+}
+
+.track-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #60a5fa 0%, #3b82f6 100%);
+  width: 0%;
+  border-radius: 4px;
+  transition: width 0.15s linear;
+}
+
+.player-bus-icon {
+  position: absolute;
+  top: -24px;
+  font-size: 20px;
+  transform: translateX(-50%);
+  transition: left 0.15s linear;
+}
+
+.ghost-bus-icon {
+  position: absolute;
+  bottom: -24px;
+  font-size: 18px;
+  opacity: 0.75;
+  filter: drop-shadow(0 0 6px var(--pixel-mint));
+  transform: translateX(-50%);
+  transition: left 0.15s linear;
+}
+
+/* 실제 버스 정류장 노선도 맵 UI (Bus Route Map Line) */
+.bus-route-map {
+  background: var(--pixel-bg-card-light);
+  border: 3px solid #110e17;
+  box-shadow: var(--pixel-shadow-sm);
+  padding: 14px 14px 14px 44px;
+  margin-bottom: 14px;
+  position: relative;
+  max-height: 180px;
+  overflow-y: auto;
+  border-radius: 6px;
+}
+
+.route-map-track {
+  position: relative;
+}
+
+.route-map-vertical-line {
+  position: absolute;
+  left: -24px;
+  top: 12px;
+  bottom: 12px;
+  width: 6px;
+  background: #4a4261;
+  border: 1px solid #110e17;
+  z-index: 1;
+}
+
+.route-map-progress-line {
+  position: absolute;
+  left: -24px;
+  top: 12px;
+  width: 6px;
+  height: 0%;
+  background: var(--pixel-yellow);
+  box-shadow: 0 0 8px var(--pixel-yellow);
+  z-index: 2;
+  transition: height 0.2s linear;
+}
+
+.route-stop-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  z-index: 3;
+}
+
+.stop-node-dot {
+  width: 18px;
+  height: 18px;
+  background: #1f1b29;
+  border: 3px solid #110e17;
+  border-radius: 50%;
+  position: absolute;
+  left: -30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: #fff;
+  transition: all 0.2s ease;
+}
+
+.route-stop-item.passed .stop-node-dot {
+  background: var(--bus-blue);
+  border-color: #110e17;
+  color: #fff;
+}
+
+.route-stop-item.active .stop-node-dot {
+  background: var(--pixel-yellow);
+  border-color: #110e17;
+  box-shadow: 0 0 10px var(--pixel-yellow);
+  transform: scale(1.25);
+}
+
+.route-stop-label {
+  font-family: var(--font-typing);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: color 0.15s ease;
+}
+
+.route-stop-item.passed .route-stop-label {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.route-stop-item.active .route-stop-label {
+  font-size: 17px;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 #110e17;
+}
+
+.active-stop-flag-tag {
+  background: var(--pixel-yellow);
+  color: #1c1917;
+  font-weight: bold;
+  font-size: 10px;
+  padding: 2px 6px;
+  border: 1px solid #110e17;
+  border-radius: 3px;
+  margin-left: 6px;
+  animation: flagWave 0.6s infinite ease-in-out;
+}
+
+/* 정류장 리빌 디스플레이 카드리스트 */
+.stops-carousel {
+  background: #171421;
+  border: 3px solid #110e17;
+  border-radius: 6px;
+  padding: 14px;
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.target-stop-number {
+  font-size: 12px;
+  color: var(--pixel-yellow);
+  margin-bottom: 4px;
+}
+
+.target-stop-name {
+  font-family: var(--font-typing);
+  font-size: 28px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+  word-break: keep-all;
+}
+
+.typing-input-large {
+  width: 100%;
+  font-family: var(--font-typing);
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+  background: #ffffff;
+  color: #1c1917;
+  border: 4px solid #110e17;
+  border-radius: 6px;
+  box-shadow: 4px 4px 0 #110e17;
+  padding: 12px;
+  outline: none;
+}
+
+.typing-input-large.input-correct {
+  border-color: var(--pixel-mint) !important;
+  box-shadow: 0 0 12px var(--pixel-mint) !important;
+  background-color: #ecfdf5 !important;
+}
+
+.typing-input-large.input-wrong {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 12px var(--danger) !important;
+  animation: shake 0.3s ease-in-out;
+  background-color: #fef2f2 !important;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+/* 5. 결과 화면 (ResultScreen) */
+.result-card {
+  background: var(--pixel-bg-card-light);
+  border: 4px solid #110e17;
+  border-radius: 8px;
+  box-shadow: var(--pixel-shadow-lg);
+  padding: 20px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.result-headline {
+  font-size: 24px;
+  color: var(--pixel-yellow);
+  margin-bottom: 8px;
+  text-shadow: 2px 2px 0 #110e17;
+}
+
+.result-time-lg {
+  font-size: 36px;
+  color: var(--pixel-mint);
+  margin: 12px 0;
+  font-weight: bold;
+}
+
+/* 모달 오버레이 (뷰포트 고정) */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(17, 14, 23, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  padding: 20px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.modal-box {
+  width: 100%;
+  max-width: 400px;
+  background: var(--pixel-bg-card-light);
+  border: 4px solid #110e17;
+  border-radius: 8px;
+  box-shadow: var(--pixel-shadow-lg);
+  padding: 20px;
+}
+
+/* 소형 모바일 (320px~400px) */
+@media (max-width: 400px) {
+  .screen-container {
+    padding: 12px 12px 60px 12px;
+  }
+  .game-title-lg {
+    font-size: 22px;
+  }
+  .target-stop-name {
+    font-size: 22px !important;
+  }
+  .typing-input-large {
+    font-size: 17px !important;
+    padding: 10px;
+  }
+  .bus-route-map {
+    max-height: 150px;
+    padding: 10px 10px 10px 38px;
+  }
+}

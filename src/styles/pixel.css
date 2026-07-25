@@ -1,0 +1,335 @@
+/* ==========================================================================
+   버스정류장 땅따먹기 — 레트로 픽셀 아트 디자인 시스템 (v3.0)
+   ========================================================================== */
+
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+@import url('https://cdn.jsdelivr.net/npm/galmuri@latest/dist/galmuri.css');
+
+:root {
+  /* 시그니처 웜 픽셀 팔레트 */
+  --pixel-bg-dark: #1e1b24;
+  --pixel-bg-card: #282436;
+  --pixel-bg-card-light: #353046;
+  --pixel-bg-input: #15131d;
+  
+  --pixel-border: #18151f;
+  --pixel-border-gold: #f59e0b;
+  
+  /* 파스텔 시그니처 테마 색상 */
+  --pixel-yellow: #facc15;   /* 대표 옐로우 */
+  --pixel-yellow-dark: #d97706;
+  --pixel-mint: #34d399;     /* 민트 */
+  --pixel-pink: #f472b6;     /* 코랄 핑크 */
+  --pixel-sky: #38bdf8;      /* 스카이 블루 */
+  --pixel-purple: #c084fc;   /* 파스텔 퍼플 */
+  --pixel-cream: #fef3c7;    /* 크림 */
+  
+  /* 버스 노선 타입별 테마 컬러 */
+  --bus-blue: #3b82f6;    /* 간선 (파랑) */
+  --bus-green: #10b981;   /* 지선 (초록) */
+  --bus-red: #ef4444;     /* 광역 (빨강) */
+  --bus-yellow: #f59e0b;  /* 순환 (노랑) */
+  
+  --text-main: #fffbeb;
+  --text-muted: #94a3b8;
+  --text-gold: #fbbf24;
+  
+  /* 폰트 지정: 타겟 글자만 산세리프(Pretendard), 타이틀/버튼은 픽셀(Galmuri) */
+  --font-pixel: 'Galmuri11', 'Galmuri9', monospace;
+  --font-typing: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+  
+  /* 3D 픽셀 그림자 */
+  --pixel-shadow: 4px 4px 0px #0e0c12;
+  --pixel-shadow-sm: 2px 2px 0px #0e0c12;
+  --pixel-shadow-lg: 6px 6px 0px #0e0c12;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--pixel-bg-dark);
+  color: var(--text-main);
+  font-family: var(--font-pixel);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background-image: 
+    radial-gradient(rgba(250, 204, 21, 0.07) 1px, transparent 0),
+    radial-gradient(rgba(255, 255, 255, 0.04) 1px, var(--pixel-bg-dark) 0);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+}
+
+/* 게임기 아케이드 프레임 */
+#app-container {
+  width: 100%;
+  max-width: 480px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--pixel-bg-card);
+  border-left: 4px solid var(--pixel-border);
+  border-right: 4px solid var(--pixel-border);
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.9);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 520px) {
+  #app-container {
+    height: max-content;
+    max-height: 90dvh;
+    border: 4px solid #110e17;
+    border-radius: 16px;
+    margin: 20px 0;
+    overflow-y: auto;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 0 8px #2d283c;
+  }
+}
+
+/* 시그니처 버튼 */
+.pixel-btn {
+  font-family: var(--font-pixel);
+  font-size: 15px;
+  font-weight: bold;
+  color: #ffffff;
+  background-color: #3b354d;
+  border: 3px solid #110e17;
+  border-radius: 6px;
+  box-shadow: var(--pixel-shadow-sm);
+  padding: 12px 20px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+  transition: all 0.08s ease;
+  position: relative;
+  text-transform: uppercase;
+}
+
+.pixel-btn:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--pixel-shadow);
+  filter: brightness(1.1);
+}
+
+.pixel-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+
+/* 대표 옐로우 버튼 */
+.pixel-btn.btn-accent {
+  background: linear-gradient(180deg, #fde047 0%, #facc15 100%);
+  color: #1c1917;
+  border-color: #110e17;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.6);
+}
+
+.pixel-btn.btn-primary {
+  background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%);
+  color: #ffffff;
+}
+
+.pixel-btn.btn-mint {
+  background: linear-gradient(180deg, #6ee7b7 0%, #34d399 100%);
+  color: #064e3b;
+}
+
+.pixel-btn.btn-danger {
+  background: linear-gradient(180deg, #fca5a5 0%, #ef4444 100%);
+  color: #ffffff;
+}
+
+.pixel-btn.btn-ghost {
+  background-color: transparent;
+  border-color: #4c4463;
+  color: var(--text-muted);
+}
+
+.pixel-btn.btn-ghost:hover {
+  color: #ffffff;
+  background: #353046;
+}
+
+/* 패널 */
+.pixel-box {
+  background-color: var(--pixel-bg-card-light);
+  border: 3px solid #110e17;
+  box-shadow: var(--pixel-shadow);
+  padding: 16px;
+  position: relative;
+  border-radius: 8px;
+}
+
+.pixel-box-inset {
+  background-color: var(--pixel-bg-input);
+  border: 3px solid #110e17;
+  border-radius: 6px;
+  padding: 12px;
+  box-shadow: inset 2px 2px 4px rgba(0,0,0,0.6);
+}
+
+/* 픽셀 말풍선 (Speech Bubble) */
+.pixel-bubble {
+  background: #fffbeb;
+  color: #1c1917;
+  border: 3px solid #110e17;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: bold;
+  position: relative;
+  box-shadow: var(--pixel-shadow-sm);
+  display: inline-block;
+}
+
+.pixel-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 20px;
+  border-width: 10px 10px 0;
+  border-style: solid;
+  border-color: #fffbeb transparent;
+  display: block;
+  width: 0;
+}
+
+.pixel-bubble::before {
+  content: '';
+  position: absolute;
+  bottom: -14px;
+  left: 18px;
+  border-width: 12px 12px 0;
+  border-style: solid;
+  border-color: #110e17 transparent;
+  display: block;
+  width: 0;
+}
+
+/* 픽셀 배너 구좌 (자체/제휴 배너 및 유저 응원 스팟) */
+.pixel-banner-slot {
+  background: linear-gradient(180deg, #2a253a 0%, #1e1b27 100%);
+  border: 2px solid var(--pixel-yellow);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  text-align: center;
+  box-shadow: var(--pixel-shadow-sm);
+}
+
+.pixel-banner-slot .banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-main);
+  line-height: 1.4;
+}
+
+/* 픽셀 신문 헤드라인 티커 */
+.pixel-news-ticker {
+  background: linear-gradient(90deg, #fef3c7 0%, #fde047 100%);
+  color: #1c1917;
+  border: 2px solid #110e17;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: var(--pixel-shadow-sm);
+  margin-bottom: 12px;
+}
+
+/* 노선 타입 배지 */
+.bus-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: bold;
+  border: 2px solid #110e17;
+  border-radius: 4px;
+  box-shadow: 1px 1px 0 #110e17;
+  color: #fff;
+  gap: 4px;
+}
+
+.bus-badge.blue { background-color: var(--bus-blue); }
+.bus-badge.green { background-color: var(--bus-green); }
+.bus-badge.red { background-color: var(--bus-red); }
+.bus-badge.yellow { background-color: var(--bus-yellow); color: #1c1917; }
+
+/* 픽셀 버스 및 깃발 애니메이션 */
+@keyframes busBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.bus-bounce {
+  animation: busBounce 0.35s infinite ease-in-out;
+}
+
+@keyframes flagWave {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(10deg); }
+}
+
+.flag-wave {
+  animation: flagWave 0.5s infinite ease-in-out;
+  transform-origin: bottom left;
+}
+
+/* 구름 애니메이션 */
+@keyframes cloudFloat {
+  0% { transform: translateX(-60px); }
+  100% { transform: translateX(500px); }
+}
+
+.pixel-cloud {
+  position: absolute;
+  background: #ffffff;
+  border: 2px solid #110e17;
+  border-radius: 8px;
+  opacity: 0.9;
+  box-shadow: 2px 2px 0 #110e17;
+  animation: cloudFloat 20s linear infinite;
+  z-index: 1;
+}
+
+.pixel-cloud.cloud-1 { top: 10px; width: 48px; height: 18px; animation-duration: 24s; }
+.pixel-cloud.cloud-2 { top: 32px; width: 64px; height: 22px; animation-duration: 16s; animation-delay: -8s; }
+
+/* Scrollbar 커스텀 */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--pixel-bg-dark);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--pixel-yellow);
+  border: 2px solid #110e17;
+  border-radius: 4px;
+}
