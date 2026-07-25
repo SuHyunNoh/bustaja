@@ -1558,8 +1558,8 @@ function renderAuthModal(container, { onClose, onUserUpdated }) {
   document.body.style.overflow = "hidden";
 
   const modalHtml = `
-    <div class="modal-overlay" id="auth-modal-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background: rgba(17, 14, 23, 0.88); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 20px; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);">
-      <div class="modal-box" style="width: 100%; max-width: 400px; background: var(--kairo-bg-card-light); border: 4px solid #110e17; border-radius: 8px; box-shadow: var(--kairo-shadow-lg); padding: 20px; text-align: left;">
+    <div class="modal-overlay modal-backdrop auth-modal-backdrop" id="auth-modal-overlay" style="position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; width: 100vw !important; height: 100vh !important; background: rgba(17, 14, 23, 0.88) !important; display: flex !important; align-items: center !important; justify-content: center !important; z-index: 99999 !important; padding: 20px !important; backdrop-filter: blur(4px) !important; -webkit-backdrop-filter: blur(4px) !important;">
+      <div class="modal-box modal-window auth-modal-window" style="width: 100% !important; max-width: 400px !important; background: var(--kairo-bg-card-light) !important; border: 4px solid #110e17 !important; border-radius: 8px !important; box-shadow: var(--kairo-shadow-lg) !important; padding: 20px !important; text-align: left !important;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
           <h2 style="font-size: 18px; color: var(--kairo-yellow); margin: 0;">👤 계정 / 닉네임 설정</h2>
           <button id="auth-modal-close" style="background: none; border: none; color: #fff; font-size: 22px; cursor: pointer; padding: 4px 8px;">✕</button>
