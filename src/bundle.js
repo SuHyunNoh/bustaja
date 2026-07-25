@@ -540,6 +540,16 @@ function getSupabase() {
   return supabaseClient;
 }
 
+// 닉네임별 최고기록(best_ms 최소)만 남기고 best_ms 오름차순 정렬 → 고유 도전자 리스트
+function dedupByNickname(rows) {
+  const bestByNick = {};
+  for (const item of rows) {
+    const n = item.nickname;
+    if (!bestByNick[n] || item.best_ms < bestByNick[n].best_ms) bestByNick[n] = item;
+  }
+  return Object.values(bestByNick).sort((a, b) => a.best_ms - b.best_ms);
+}
+
 // 1. Supabase DB에서 특정 노선 1위 영주 및 TOP 랭킹 Direct SELECT 쿼리
 async function fetchBoardDirectFromSupabase(routeId, diffKey = "easy") {
   const boardId = `${routeId}__${diffKey}`;
@@ -548,7 +558,7 @@ async function fetchBoardDirectFromSupabase(routeId, diffKey = "easy") {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000);
-    const url = `${SUPABASE_URL}/rest/v1/scores?board_id=eq.${boardId}&order=best_ms.asc&limit=10`;
+    const url = `${SUPABASE_URL}/rest/v1/scores?board_id=eq.${boardId}&order=best_ms.asc&limit=200`;
 
     const res = await fetch(url, {
       method: "GET",
@@ -565,7 +575,9 @@ async function fetchBoardDirectFromSupabase(routeId, diffKey = "easy") {
     if (res && res.ok) {
       const dataList = await res.json();
       if (Array.isArray(dataList) && dataList.length > 0) {
-        const top = dataList[0];
+        // 닉네임별 최고기록만 남겨 중복 제거 → 고유 도전자 수 + 깔끔한 랭킹
+        const unique = dedupByNickname(dataList);
+        const top = unique[0];
         return {
           routeId,
           difficulty: diffKey,
@@ -573,8 +585,8 @@ async function fetchBoardDirectFromSupabase(routeId, diffKey = "easy") {
           bestMs: top.best_ms,
           bestSplits: top.splits || [],
           occupiedSince: top.created_at || new Date().toISOString(),
-          challengerCount: dataList.length,
-          scores: dataList.map((item, idx) => ({
+          challengerCount: unique.length,
+          scores: unique.slice(0, 10).map((item, idx) => ({
             rank: idx + 1,
             nickname: item.nickname,
             bestMs: item.best_ms,
@@ -599,7 +611,8 @@ async function fetchBoardDirectFromSupabase(routeId, diffKey = "easy") {
         .limit(10);
 
       if (!error && Array.isArray(data) && data.length > 0) {
-        const top = data[0];
+        const unique = dedupByNickname(data);
+        const top = unique[0];
         return {
           routeId,
           difficulty: diffKey,
@@ -607,8 +620,8 @@ async function fetchBoardDirectFromSupabase(routeId, diffKey = "easy") {
           bestMs: top.best_ms,
           bestSplits: top.splits || [],
           occupiedSince: top.created_at || new Date().toISOString(),
-          challengerCount: data.length,
-          scores: data.map((item, idx) => ({
+          challengerCount: unique.length,
+          scores: unique.slice(0, 10).map((item, idx) => ({
             rank: idx + 1,
             nickname: item.nickname,
             bestMs: item.best_ms,
@@ -1865,26 +1878,41 @@ function renderHomeScreen(container, { onStartClick, onAuthClick, onSelectRoute,
     }
   }, 3600000);
 
-  // 3초 간격 크로스 브라우저 실시간 자동 동기화 폴링 (엣지에서 완주 시 크롬에 손 안 대고 3초 내 자동 반영!)
-  const liveSyncInterval = setInterval(() => {
-    syncCloudBoardsToLocal().then(updated => {
-      if (updated) {
-        const updatedHotRoutes = getHotRoutes();
-        const listEl = container.querySelector("#hot-routes-list-container");
-        if (listEl) {
-          listEl.innerHTML = renderHotRoutesHTML(updatedHotRoutes);
-          bindHotRouteEvents();
+  // 4초 간격 클라우드 Direct Fetch (A안: 핫 노선 상위 5개 클라우드 1등/도전자 수 즉시 실시간 반영)
+  const refreshHotRoutesDirectFromCloud = async () => {
+    try {
+      await syncCloudBoardsToLocal();
+      const hotList = getHotRoutes();
+
+      // 상위 5개 노선에 대해 클라우드에서 직접 dedup 랭킹 수신
+      const cloudPromises = hotList.map(r => fetchBoardDirectFromSupabase(r.routeId, "easy"));
+      const cloudBoards = await Promise.all(cloudPromises);
+
+      cloudBoards.forEach((cb, idx) => {
+        if (cb && cb.occupantNick) {
+          hotList[idx].occupant = cb.occupantNick;
+          hotList[idx].challengers = cb.challengerCount || 1;
+          if (cb.bestMs) {
+            hotList[idx].bestMs = cb.bestMs;
+            hotList[idx].diffSec = `${(cb.bestMs / 1000).toFixed(2)}초 기록`;
+            hotList[idx].status = "🔥 영주 사수 중";
+          }
         }
-        const newsEl = container.querySelector("#home-news-text");
-        if (newsEl) {
-          const updatedNews = getLongestOccupantNews();
-          newsEl.textContent = updatedNews.isDefault 
-            ? '[시내버스 속보] 6642번 노선을 완주하고 첫 번째 영주가 되어보세요! ✨' 
-            : `[시내버스 속보] ${updatedNews.routeNo}번 노선, '${updatedNews.occupantNick}' 님 ${updatedNews.occupiedDays}일째 장기 점령 중! ✨`;
-        }
+      });
+
+      const listEl = container.querySelector("#hot-routes-list-container");
+      if (listEl) {
+        listEl.innerHTML = renderHotRoutesHTML(hotList);
+        bindHotRouteEvents();
       }
-    });
-  }, 3000);
+    } catch (e) {
+      console.warn("[HomeScreen Cloud Refresh Warn]", e);
+    }
+  };
+
+  // 즉시 1회 실행 후 4초 폴링
+  refreshHotRoutesDirectFromCloud();
+  const liveSyncInterval = setInterval(refreshHotRoutesDirectFromCloud, 4000);
 
   // 이벤트 바인딩 시 인터벌 해제 포함
   const clearAllTimers = () => {
