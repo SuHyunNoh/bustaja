@@ -1,4 +1,4 @@
-﻿/* BusTaja Standalone Bundle v3.2.1 */
+﻿/* BusTaja Standalone Bundle v3.3.0 */
 // --- File: d:\Project\busstop\src\data\routes.js ---
 // ==========================================================================
 // 버스타자 (BusTaja) — 100% 아름다운 실제 한글 정류소 명칭 버스 노선 DB
@@ -1287,6 +1287,176 @@ function submitChallengeResult({ challengeId, challengerNick, challengerTotalMs,
     senderNick: challenge.fromNick,
     senderTotalMs: challenge.totalMs
   };
+}
+
+// --- File: d:\Project\busstop\src\game\ghost.js ---
+// ==========================================================================
+// 버스정류장 땅따먹기 — 1위 / 내기록 고스트 재생 엔진 (F-D)
+// ==========================================================================
+
+class GhostPlayer {
+  constructor(bestSplits = [], totalStops = 1) {
+    this.bestSplits = bestSplits; // [ms1, ms2, ms3...]
+    this.totalStops = totalStops;
+  }
+
+  // 현재 경과 시간(elapsedMs)에 따른 고스트의 진행 정류장 인덱스 및 위치 계산
+  getGhostStatus(elapsedMs) {
+    if (!this.bestSplits || this.bestSplits.length === 0) {
+      return {
+        ghostIndex: 0,
+        ghostProgressPercent: 0,
+        isGhostFinished: false
+      };
+    }
+
+    let ghostIndex = 0;
+    for (let i = 0; i < this.bestSplits.length; i++) {
+      if (elapsedMs >= this.bestSplits[i]) {
+        ghostIndex = i + 1;
+      } else {
+        break;
+      }
+    }
+
+    const isGhostFinished = ghostIndex >= this.totalStops;
+    const ghostProgressPercent = Math.min(100, Math.round((ghostIndex / this.totalStops) * 100));
+
+    return {
+      ghostIndex: Math.min(ghostIndex, this.totalStops),
+      ghostProgressPercent,
+      isGhostFinished
+    };
+  }
+
+  // 플레이어와의 실시간 차이 (Ahead / Behind delta seconds)
+  getDeltaTime(playerIndex, playerElapsedMs) {
+    if (!this.bestSplits || this.bestSplits.length === 0) return { deltaSec: 0, isAhead: true };
+
+    // 플레이어가 현재 도달한 정류장에 고스트가 도달했던 시간 비교
+    const targetSplitIndex = Math.max(0, playerIndex - 1);
+    const ghostTimeAtStop = this.bestSplits[targetSplitIndex] || (playerElapsedMs + 5000);
+
+    const diffMs = playerElapsedMs - ghostTimeAtStop;
+    const deltaSec = (Math.abs(diffMs) / 1000).toFixed(2);
+    const isAhead = diffMs <= 0; // 플레이어가 고스트보다 빠르면 isAhead = true
+
+    return { deltaSec, isAhead, diffMs };
+  }
+}
+
+// --- File: d:\Project\busstop\src\game\revealEngine.js ---
+// ==========================================================================
+// 버스정류장 땅따먹기 — 정류장 텍스트 리빌 & 엔터 제출 타이머 엔진 (revealEngine.js)
+// 첫 번째 정류장 타이핑 시작 시점부터 타이머가 흘러가도록 대기 모드 연동
+// ==========================================================================
+
+class RevealEngine {
+  constructor(stops, onUpdate, onComplete) {
+    this.stops = stops; // [{seq, name}]
+    this.currentIndex = 0;
+    this.startTime = null;
+    this.elapsedMs = 0;
+    this.splits = [];
+    this.timerId = null;
+    this.isFinished = false;
+    this.hasStarted = false; // 첫 타자 입력 시 타이머 측정 시작 플래그
+    
+    this.onUpdate = onUpdate || (() => {});
+    this.onComplete = onComplete || (() => {});
+  }
+
+  // 게임 준비 상태 (아직 타이머는 흐르지 않음)
+  ready() {
+    this.currentIndex = 0;
+    this.splits = [];
+    this.isFinished = false;
+    this.hasStarted = false;
+    this.elapsedMs = 0;
+    this.startTime = null;
+    this.notifyUpdate();
+  }
+
+  // 첫 타자 입력 시 타이머 측정 시작
+  startTimer() {
+    if (this.hasStarted || this.isFinished) return;
+    this.hasStarted = true;
+    this.startTime = performance.now();
+    this.timerId = requestAnimationFrame(this.tick.bind(this));
+    this.notifyUpdate();
+  }
+
+  tick() {
+    if (this.isFinished || !this.hasStarted) return;
+
+    this.elapsedMs = Math.round(performance.now() - this.startTime);
+    this.notifyUpdate();
+
+    this.timerId = requestAnimationFrame(this.tick.bind(this));
+  }
+
+  // 엔터(Enter) 키 제출 시 정류장 이름 검증
+  submitInput(inputText) {
+    if (this.isFinished) return { matched: false, finished: true };
+
+    // 혹시라도 startTimer가 안 켜졌다면 제출 시 자동 시작
+    if (!this.hasStarted) {
+      this.startTimer();
+    }
+
+    const currentTarget = this.stops[this.currentIndex];
+    if (!currentTarget) return { matched: false, finished: false };
+
+    const cleanInput = inputText.trim();
+    const cleanTarget = currentTarget.name.trim();
+
+    // 정확히 매칭된 경우
+    if (cleanInput === cleanTarget) {
+      const splitTime = this.elapsedMs;
+      this.splits.push(splitTime);
+      this.currentIndex++;
+
+      const finished = this.currentIndex >= this.stops.length;
+      if (finished) {
+        this.finish();
+      } else {
+        this.notifyUpdate();
+      }
+      return { matched: true, finished };
+    }
+
+    // 불일치 시
+    return { matched: false, finished: false };
+  }
+
+  finish() {
+    this.isFinished = true;
+    if (this.timerId) cancelAnimationFrame(this.timerId);
+    this.notifyUpdate();
+    this.onComplete({
+      totalMs: this.elapsedMs,
+      splits: this.splits,
+      stopCount: this.stops.length
+    });
+  }
+
+  stop() {
+    this.isFinished = true;
+    if (this.timerId) cancelAnimationFrame(this.timerId);
+  }
+
+  notifyUpdate() {
+    this.onUpdate({
+      currentIndex: this.currentIndex,
+      currentStop: this.stops[this.currentIndex] || null,
+      nextStop: this.stops[this.currentIndex + 1] || null,
+      totalStops: this.stops.length,
+      elapsedMs: this.elapsedMs,
+      hasStarted: this.hasStarted,
+      progressPercent: Math.min(100, Math.round((this.currentIndex / this.stops.length) * 100)),
+      isFinished: this.isFinished
+    });
+  }
 }
 
 // --- File: d:\Project\busstop\src\ui\components.js ---
@@ -2776,6 +2946,9 @@ class App {
     try {
       this.updateHeader();
 
+      // 해시 변화 리스너 감지 (브라우저 뒤로가기/앞으로가기/새로고침 100% 대응)
+      window.addEventListener("hashchange", () => this.handleHashRoute());
+
       const urlParams = new URLSearchParams(window.location.search);
       const challengeId = urlParams.get("c");
 
@@ -2783,7 +2956,7 @@ class App {
         this.currentChallengeId = challengeId;
         this.navigate("challenge_entry");
       } else {
-        this.navigate("home");
+        this.handleHashRoute();
       }
     } catch (err) {
       console.error("[App Init Fatal Error]", err);
@@ -2791,6 +2964,27 @@ class App {
       try {
         this.navigate("home");
       } catch (e) {}
+    }
+  }
+
+  handleHashRoute() {
+    const hash = window.location.hash || "#/";
+    if (hash.startsWith("#/route/")) {
+      const routeId = hash.replace("#/route/", "").trim();
+      this.selectedRouteId = routeId || "ROUTE_6642";
+      this.navigate("detail", {}, false);
+    } else if (hash.startsWith("#/game/")) {
+      const parts = hash.replace("#/game/", "").split("/");
+      this.selectedRouteId = parts[0] || "ROUTE_6642";
+      this.selectedDifficulty = parts[1] || "easy";
+      this.navigate("game", {}, false);
+    } else if (hash.startsWith("#/search")) {
+      const query = hash.includes("?q=") ? hash.split("?q=")[1] : "";
+      this.navigate("search", { query }, false);
+    } else if (hash.startsWith("#/result")) {
+      this.navigate("result", {}, false);
+    } else {
+      this.navigate("home", {}, false);
     }
   }
 
@@ -2854,99 +3048,112 @@ class App {
     }
   }
 
-  navigate(screenName, params = {}) {
+  navigate(screenName, params = {}, updateHash = true) {
     this.currentScreen = screenName;
     this.screenSlot.innerHTML = "";
 
+    // URL 해시 갱신 (각 화면별 고유 URL 구분)
+    if (updateHash) {
+      if (screenName === "home") window.location.hash = "#/";
+      else if (screenName === "search") window.location.hash = `#/search?q=${params.query || ''}`;
+      else if (screenName === "detail") window.location.hash = `#/route/${this.selectedRouteId}`;
+      else if (screenName === "game") window.location.hash = `#/game/${this.selectedRouteId}/${this.selectedDifficulty}`;
+      else if (screenName === "result") window.location.hash = "#/result";
+    }
+
     // GA4 화면 방문 기록
-    trackPageView(screenName);
+    if (typeof trackPageView === "function") trackPageView(screenName);
 
-    switch (screenName) {
-      case "home":
-        this.isChallengeMatch = false;
-        this.activeChallengeData = null;
-        renderHomeScreen(this.screenSlot, {
-          onStartClick: (query = "") => {
-            this.navigate("search", { query });
-          },
-          onAuthClick: () => this.openAuthModal(),
-          onSelectRoute: (routeId) => {
-            this.selectedRouteId = routeId;
-            this.navigate("detail");
-          },
-          currentUser: getCurrentUser()
-        });
-        break;
+    try {
+      switch (screenName) {
+        case "home":
+          this.isChallengeMatch = false;
+          this.activeChallengeData = null;
+          renderHomeScreen(this.screenSlot, {
+            onStartClick: (query = "") => {
+              this.navigate("search", { query });
+            },
+            onAuthClick: () => this.openAuthModal(),
+            onSelectRoute: (routeId) => {
+              this.selectedRouteId = routeId;
+              this.navigate("detail");
+            },
+            currentUser: getCurrentUser()
+          });
+          break;
 
-      case "search":
-        renderRouteSearchScreen(this.screenSlot, {
-          initialQuery: params.query || "",
-          onSelectRoute: (routeId) => {
-            this.selectedRouteId = routeId;
-            this.navigate("detail");
-          },
-          onBack: () => this.navigate("home")
-        });
-        break;
+        case "search":
+          renderRouteSearchScreen(this.screenSlot, {
+            initialQuery: params.query || "",
+            onSelectRoute: (routeId) => {
+              this.selectedRouteId = routeId;
+              this.navigate("detail");
+            },
+            onBack: () => this.navigate("home")
+          });
+          break;
 
-      case "detail":
-        renderRouteDetailScreen(this.screenSlot, {
-          routeId: this.selectedRouteId,
-          onStartGame: ({ routeId, difficulty, board }) => {
-            this.selectedRouteId = routeId;
-            this.selectedDifficulty = difficulty;
-            this.lastBoardData = board;
-            this.isChallengeMatch = false;
-            this.activeChallengeData = null;
-            this.navigate("game");
-          },
-          onBack: () => this.navigate("search")
-        });
-        break;
+        case "detail":
+          renderRouteDetailScreen(this.screenSlot, {
+            routeId: this.selectedRouteId,
+            onStartGame: ({ routeId, difficulty, board }) => {
+              this.selectedRouteId = routeId;
+              this.selectedDifficulty = difficulty;
+              this.lastBoardData = board;
+              this.isChallengeMatch = false;
+              this.activeChallengeData = null;
+              this.navigate("game");
+            },
+            onBack: () => this.navigate("search")
+          });
+          break;
 
-      case "challenge_entry":
-        renderChallengeEntryScreen(this.screenSlot, {
-          challengeId: this.currentChallengeId,
-          onAcceptChallenge: (challenge) => {
-            this.selectedRouteId = challenge.routeId;
-            this.selectedDifficulty = challenge.difficulty;
-            this.isChallengeMatch = true;
-            this.activeChallengeData = challenge;
-            this.navigate("game");
-          },
-          onHome: () => this.navigate("home")
-        });
-        break;
+        case "challenge_entry":
+          renderChallengeEntryScreen(this.screenSlot, {
+            challengeId: this.currentChallengeId,
+            onAcceptChallenge: (challenge) => {
+              this.selectedRouteId = challenge.routeId;
+              this.selectedDifficulty = challenge.difficulty;
+              this.isChallengeMatch = true;
+              this.activeChallengeData = challenge;
+              this.navigate("game");
+            },
+            onHome: () => this.navigate("home")
+          });
+          break;
 
-      case "game":
-        renderGameScreen(this.screenSlot, {
-          routeId: this.selectedRouteId,
-          difficulty: this.selectedDifficulty,
-          board: this.lastBoardData || {},
-          isChallengeMatch: this.isChallengeMatch,
-          challengeData: this.activeChallengeData,
-          onGameComplete: (resultData) => {
-            this.lastGameData = resultData;
-            this.navigate("result");
-          },
-          onQuit: () => this.navigate(this.isChallengeMatch ? "challenge_entry" : "detail")
-        });
-        break;
+        case "game":
+          renderGameScreen(this.screenSlot, {
+            routeId: this.selectedRouteId,
+            difficulty: this.selectedDifficulty,
+            board: this.lastBoardData || {},
+            isChallengeMatch: this.isChallengeMatch,
+            challengeData: this.activeChallengeData,
+            onGameComplete: (resultData) => {
+              this.lastGameData = resultData;
+              this.navigate("result");
+            },
+            onQuit: () => this.navigate("detail")
+          });
+          break;
 
-      case "result":
-        renderResultScreen(this.screenSlot, {
-          routeId: this.selectedRouteId,
-          difficulty: this.selectedDifficulty,
-          resultData: this.lastGameData,
-          isChallengeMatch: this.isChallengeMatch,
-          challengeData: this.activeChallengeData,
-          onRetry: () => this.navigate("game"),
-          onHome: () => this.navigate("home")
-        });
-        break;
+        case "result":
+          renderResultScreen(this.screenSlot, {
+            gameData: this.lastGameData || {},
+            isChallengeMatch: this.isChallengeMatch,
+            challengeData: this.activeChallengeData,
+            onRetry: () => this.navigate("game"),
+            onHome: () => this.navigate("home")
+          });
+          break;
 
-      default:
-        this.navigate("home");
+        default:
+          this.navigate("home");
+      }
+    } catch (err) {
+      console.error("[Router Execution Error]", screenName, err);
+      // 화면 렌더링 에러 시 안심 폴백
+      if (screenName !== "home") this.navigate("home");
     }
 
     // 모든 화면 하단 스크롤 안쪽에 정갈하게 푸터 주입
