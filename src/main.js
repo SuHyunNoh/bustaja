@@ -1,9 +1,8 @@
 // ==========================================================================
-// 버스정류장 땅따먹기 — Main App Router & Entry Point (v3.0)
-// 1. 버스 노선도 UI (Bus Route Map Line)
-// 2. GA4 페이지 방문 & 주요 이벤트 추적 (ga.js)
-// 3. 카카오톡 도전장 공유 링크(?c=challengeId) 수신 및 대결 / 승패 플로우
-// 4. 카이로소프트 프레임 내부 스크롤 하단 푸터 (법적 고지 & FAQ 모달 연동)
+// 버스타자 (BusTaja) — Main App Router & Entry Point
+// 1. URL Hash Router (/#/, /#/search, /#/route/:id, /#/game/:id/:diff, /#/result)
+// 2. GA4 페이지 방문 & 주요 이벤트 추적
+// 3. 카카오톡 도전장 연동 및 픽셀 HUD 푸터
 // ==========================================================================
 
 import { renderHeaderHUD } from "./ui/components.js";
@@ -27,10 +26,12 @@ class App {
     if (loader && loader.parentNode) {
       loader.parentNode.removeChild(loader);
     }
+
     this.appContainer = document.getElementById("app-container");
     if (this.appContainer) {
       this.appContainer.innerHTML = "";
     }
+
     this.headerSlot = document.createElement("div");
     this.screenSlot = document.createElement("div");
     this.screenSlot.className = "screen-container-wrapper";
@@ -38,8 +39,10 @@ class App {
     this.screenSlot.style.display = "flex";
     this.screenSlot.style.flexDirection = "column";
 
-    this.appContainer.appendChild(this.headerSlot);
-    this.appContainer.appendChild(this.screenSlot);
+    if (this.appContainer) {
+      this.appContainer.appendChild(this.headerSlot);
+      this.appContainer.appendChild(this.screenSlot);
+    }
 
     this.currentScreen = "home";
     this.selectedRouteId = "ROUTE_6642";
@@ -47,7 +50,6 @@ class App {
     this.lastGameData = null;
     this.lastBoardData = null;
     
-    // 친구 도전장 대결 모드 데이터
     this.isChallengeMatch = false;
     this.activeChallengeData = null;
 
@@ -66,6 +68,9 @@ class App {
     try {
       this.updateHeader();
 
+      // 4.0 정석 URL 해시변화 감지 리스너 (새로고침/뒤로가기 100% 원천 대응)
+      window.addEventListener("hashchange", () => this.handleHashRoute());
+
       const urlParams = new URLSearchParams(window.location.search);
       const challengeId = urlParams.get("c");
 
@@ -73,14 +78,35 @@ class App {
         this.currentChallengeId = challengeId;
         this.navigate("challenge_entry");
       } else {
-        this.navigate("home");
+        this.handleHashRoute();
       }
     } catch (err) {
       console.error("[App Init Fatal Error]", err);
-      // 치명적 에러 발생 시에도 화면 백화 방지 강제 홈 렌더링
       try {
         this.navigate("home");
       } catch (e) {}
+    }
+  }
+
+  handleHashRoute() {
+    const hash = window.location.hash || "#/";
+
+    if (hash.startsWith("#/route/")) {
+      const routeId = hash.replace("#/route/", "").trim();
+      this.selectedRouteId = routeId || "ROUTE_6642";
+      this.navigate("detail", {}, false);
+    } else if (hash.startsWith("#/game/")) {
+      const parts = hash.replace("#/game/", "").split("/");
+      this.selectedRouteId = parts[0] || "ROUTE_6642";
+      this.selectedDifficulty = parts[1] || "easy";
+      this.navigate("game", {}, false);
+    } else if (hash.startsWith("#/search")) {
+      const query = hash.includes("?q=") ? hash.split("?q=")[1] : "";
+      this.navigate("search", { query }, false);
+    } else if (hash.startsWith("#/result")) {
+      this.navigate("result", {}, false);
+    } else {
+      this.navigate("home", {}, false);
     }
   }
 
@@ -102,10 +128,9 @@ class App {
   }
 
   refreshCurrentScreen() {
-    this.navigate(this.currentScreen);
+    this.navigate(this.currentScreen, {}, false);
   }
 
-  // 화면 스크롤 하단에 안전하고 예쁘게 주입하는 픽셀 푸터 HTML
   getFooterHTML() {
     return `
       <footer class="pixel-footer" style="width: 100%; padding: 16px 10px; margin-top: 20px; text-align: center; font-size: 11px; color: var(--text-muted); border-top: 2px dashed #3b354d; background: var(--kairo-bg-input); border-radius: 6px;">
@@ -144,102 +169,115 @@ class App {
     }
   }
 
-  navigate(screenName, params = {}) {
+  navigate(screenName, params = {}, updateHash = true) {
     this.currentScreen = screenName;
     this.screenSlot.innerHTML = "";
 
-    // GA4 화면 방문 기록
-    trackPageView(screenName);
-
-    switch (screenName) {
-      case "home":
-        this.isChallengeMatch = false;
-        this.activeChallengeData = null;
-        renderHomeScreen(this.screenSlot, {
-          onStartClick: (query = "") => {
-            this.navigate("search", { query });
-          },
-          onAuthClick: () => this.openAuthModal(),
-          onSelectRoute: (routeId) => {
-            this.selectedRouteId = routeId;
-            this.navigate("detail");
-          },
-          currentUser: getCurrentUser()
-        });
-        break;
-
-      case "search":
-        renderRouteSearchScreen(this.screenSlot, {
-          initialQuery: params.query || "",
-          onSelectRoute: (routeId) => {
-            this.selectedRouteId = routeId;
-            this.navigate("detail");
-          },
-          onBack: () => this.navigate("home")
-        });
-        break;
-
-      case "detail":
-        renderRouteDetailScreen(this.screenSlot, {
-          routeId: this.selectedRouteId,
-          onStartGame: ({ routeId, difficulty, board }) => {
-            this.selectedRouteId = routeId;
-            this.selectedDifficulty = difficulty;
-            this.lastBoardData = board;
-            this.isChallengeMatch = false;
-            this.activeChallengeData = null;
-            this.navigate("game");
-          },
-          onBack: () => this.navigate("search")
-        });
-        break;
-
-      case "challenge_entry":
-        renderChallengeEntryScreen(this.screenSlot, {
-          challengeId: this.currentChallengeId,
-          onAcceptChallenge: (challenge) => {
-            this.selectedRouteId = challenge.routeId;
-            this.selectedDifficulty = challenge.difficulty;
-            this.isChallengeMatch = true;
-            this.activeChallengeData = challenge;
-            this.navigate("game");
-          },
-          onHome: () => this.navigate("home")
-        });
-        break;
-
-      case "game":
-        renderGameScreen(this.screenSlot, {
-          routeId: this.selectedRouteId,
-          difficulty: this.selectedDifficulty,
-          board: this.lastBoardData || {},
-          isChallengeMatch: this.isChallengeMatch,
-          challengeData: this.activeChallengeData,
-          onGameComplete: (resultData) => {
-            this.lastGameData = resultData;
-            this.navigate("result");
-          },
-          onQuit: () => this.navigate(this.isChallengeMatch ? "challenge_entry" : "detail")
-        });
-        break;
-
-      case "result":
-        renderResultScreen(this.screenSlot, {
-          routeId: this.selectedRouteId,
-          difficulty: this.selectedDifficulty,
-          resultData: this.lastGameData,
-          isChallengeMatch: this.isChallengeMatch,
-          challengeData: this.activeChallengeData,
-          onRetry: () => this.navigate("game"),
-          onHome: () => this.navigate("home")
-        });
-        break;
-
-      default:
-        this.navigate("home");
+    // 4.0 정석 URL 해시 갱신 (독립적인 Clean URL 분리)
+    if (updateHash) {
+      if (screenName === "home") window.location.hash = "#/";
+      else if (screenName === "search") window.location.hash = `#/search?q=${params.query || ''}`;
+      else if (screenName === "detail") window.location.hash = `#/route/${this.selectedRouteId}`;
+      else if (screenName === "game") window.location.hash = `#/game/${this.selectedRouteId}/${this.selectedDifficulty}`;
+      else if (screenName === "result") window.location.hash = "#/result";
     }
 
-    // 모든 화면 하단 스크롤 안쪽에 정갈하게 푸터 주입
+    if (typeof trackPageView === "function") trackPageView(screenName);
+
+    try {
+      switch (screenName) {
+        case "home":
+          this.isChallengeMatch = false;
+          this.activeChallengeData = null;
+          renderHomeScreen(this.screenSlot, {
+            onStartClick: (query = "") => {
+              this.navigate("search", { query });
+            },
+            onAuthClick: () => this.openAuthModal(),
+            onSelectRoute: (routeId) => {
+              this.selectedRouteId = routeId;
+              this.navigate("detail");
+            },
+            currentUser: getCurrentUser()
+          });
+          break;
+
+        case "search":
+          renderRouteSearchScreen(this.screenSlot, {
+            initialQuery: params.query || "",
+            onSelectRoute: (routeId) => {
+              this.selectedRouteId = routeId;
+              this.navigate("detail");
+            },
+            onBack: () => this.navigate("home")
+          });
+          break;
+
+        case "detail":
+          renderRouteDetailScreen(this.screenSlot, {
+            routeId: this.selectedRouteId,
+            onStartGame: ({ routeId, difficulty, board }) => {
+              this.selectedRouteId = routeId;
+              this.selectedDifficulty = difficulty;
+              this.lastBoardData = board;
+              this.isChallengeMatch = false;
+              this.activeChallengeData = null;
+              this.navigate("game");
+            },
+            onBack: () => this.navigate("search")
+          });
+          break;
+
+        case "challenge_entry":
+          renderChallengeEntryScreen(this.screenSlot, {
+            challengeId: this.currentChallengeId,
+            onAcceptChallenge: (challenge) => {
+              this.selectedRouteId = challenge.routeId;
+              this.selectedDifficulty = challenge.difficulty;
+              this.isChallengeMatch = true;
+              this.activeChallengeData = challenge;
+              this.navigate("game");
+            },
+            onHome: () => this.navigate("home")
+          });
+          break;
+
+        case "game":
+          renderGameScreen(this.screenSlot, {
+            routeId: this.selectedRouteId,
+            difficulty: this.selectedDifficulty,
+            board: this.lastBoardData || {},
+            isChallengeMatch: this.isChallengeMatch,
+            challengeData: this.activeChallengeData,
+            onGameComplete: (resultData) => {
+              this.lastGameData = resultData;
+              this.navigate("result");
+            },
+            onQuit: () => this.navigate("detail")
+          });
+          break;
+
+        case "result":
+          renderResultScreen(this.screenSlot, {
+            routeId: this.selectedRouteId,
+            difficulty: this.selectedDifficulty,
+            gameData: this.lastGameData || {},
+            resultData: this.lastGameData || {},
+            isChallengeMatch: this.isChallengeMatch,
+            challengeData: this.activeChallengeData,
+            onRetry: () => this.navigate("game"),
+            onHome: () => this.navigate("home")
+          });
+          break;
+
+        default:
+          this.navigate("home");
+      }
+    } catch (err) {
+      console.error("[Router Execution Error]", screenName, err);
+      if (screenName !== "home") this.navigate("home");
+    }
+
     const screenContainer = this.screenSlot.querySelector(".screen-container");
     if (screenContainer) {
       screenContainer.insertAdjacentHTML("beforeend", this.getFooterHTML());
@@ -248,9 +286,11 @@ class App {
   }
 }
 
-// Launch App (DOM 준비 상태에 관계없이 100% 즉각 인스턴스 실행)
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => new App());
-} else {
-  new App();
+// 클래스 밖 독립된 안전 실행 부트스트랩 (중괄호 매칭 100% 매칭)
+try {
+  if (!window.__bustaja_app_instance__) {
+    window.__bustaja_app_instance__ = new App();
+  }
+} catch (err) {
+  console.error("[App Global Launch Failure]", err);
 }

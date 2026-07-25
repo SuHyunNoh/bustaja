@@ -741,7 +741,7 @@ function getBusBadgeInfo(routeNo = "", routeType = "") {
 const SUPABASE_REST_URL = "https://wnvioqmkyymvmahecjye.supabase.co/rest/v1/scores";
 const SUPABASE_REST_KEY = "sb_publishable_knih9nw6Vw9BoSLDGCCgbw_1UhxuEu2";
 
-// 100% 보장형 글로벌 점령 정보 실시간 비동기 싱크 (네트워크 지연 시에도 UI 렌더링 100% 원천 보장)
+// 100% 보장형 글로벌 점령 정보 실시간 비동기 싱크 (로컬 개인 스코어 및 localItem 보존)
 async function syncCloudBoardsToLocal() {
   const raw = localStorage.getItem(BOARDS_STORAGE_KEY);
   const localMap = raw ? JSON.parse(raw) : {};
@@ -770,12 +770,15 @@ async function syncCloudBoardsToLocal() {
           if (key && item.nickname) {
             const localItem = localMap[key];
             if (!localItem || !localItem.bestMs || item.best_ms <= localItem.bestMs || localItem.occupantNick === "미점령 (첫 영주에 도전하세요!)") {
+              // 기존 로컬 보드 데이터를 보존하고 클라우드 점령자 정보만 정밀 갱신!
               localMap[key] = {
+                ...(localItem || {}),
                 routeId: item.route_id || key.split("__")[0],
                 difficulty: item.difficulty || key.split("__")[1] || "easy",
                 occupantNick: item.nickname,
                 bestMs: item.best_ms,
-                occupiedSince: item.created_at || new Date().toISOString()
+                occupiedSince: item.created_at || (localItem && localItem.occupiedSince) || new Date().toISOString(),
+                scores: (localItem && localItem.scores) ? localItem.scores : []
               };
             }
           }
@@ -2798,7 +2801,7 @@ function renderChallengeEntryScreen(container, { challengeId, onAcceptChallenge,
 
 // --- File: d:\Project\busstop\src\main.js ---
 // ==========================================================================
-// 버스타자 4.0 (BusTaja 4.0) — Main App Router & Entry Point
+// 버스타자 (BusTaja) — Main App Router & Entry Point
 // 1. URL Hash Router (/#/, /#/search, /#/route/:id, /#/game/:id/:diff, /#/result)
 // 2. GA4 페이지 방문 & 주요 이벤트 추적
 // 3. 카카오톡 도전장 연동 및 픽셀 HUD 푸터
@@ -3072,9 +3075,12 @@ class App {
   }
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => new App());
-} else {
-  new App();
+// 클래스 밖 독립된 안전 실행 부트스트랩 (중괄호 매칭 100% 매칭)
+try {
+  if (!window.__bustaja_app_instance__) {
+    window.__bustaja_app_instance__ = new App();
+  }
+} catch (err) {
+  console.error("[App Global Launch Failure]", err);
 }
 
