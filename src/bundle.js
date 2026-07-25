@@ -2162,6 +2162,8 @@ function renderRouteDetailScreen(container, { routeId, onStartGame, onBack }) {
     const refreshLiveBoard = () => {
       getBoardByRouteAndDiffAsync(routeId, currentDiff).then(liveBoard => {
         if (liveBoard) {
+          board = liveBoard; // 최신 Supabase DB 1위 랭킹 객체로 100% 갱신!
+
           const occNameEl = container.querySelector("#detail-occupant-name");
           if (occNameEl) occNameEl.textContent = liveBoard.occupantNick;
 
