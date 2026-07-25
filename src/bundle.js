@@ -756,27 +756,39 @@ async function syncCloudBoardsToLocal() {
     if (res && res.ok) {
       const dataList = await res.json();
       if (Array.isArray(dataList)) {
+        // 1. board_id 별로 레코드 그룹화
+        const boardGroups = {};
         dataList.forEach(item => {
           const key = item.board_id;
           if (key && item.nickname) {
-            const localItem = localMap[key];
-            const parts = key.split("__");
-            const parsedRouteId = parts[0] || "ROUTE_6642";
-            const parsedDiff = parts[1] || "easy";
-
-            if (!localItem || !localItem.bestMs || item.best_ms <= localItem.bestMs || localItem.occupantNick === "미점령 (첫 영주에 도전하세요!)") {
-              // 기존 로컬 보드 데이터를 보존하고 클라우드 점령자 정보만 정밀 갱신!
-              localMap[key] = {
-                ...(localItem || {}),
-                routeId: parsedRouteId,
-                difficulty: parsedDiff,
-                occupantNick: item.nickname,
-                bestMs: item.best_ms,
-                occupiedSince: item.created_at || (localItem && localItem.occupiedSince) || new Date().toISOString(),
-                scores: (localItem && localItem.scores) ? localItem.scores : []
-              };
-            }
+            if (!boardGroups[key]) boardGroups[key] = [];
+            boardGroups[key].push(item);
           }
+        });
+
+        // 2. 각 board_id 별 최단시간 1위 점령자 및 유니크 도전자 수 정밀 계산
+        Object.keys(boardGroups).forEach(key => {
+          const items = boardGroups[key];
+          items.sort((a, b) => a.best_ms - b.best_ms); // 최단시간 1위 정렬
+          const top1 = items[0];
+          const uniqueNicks = new Set(items.map(i => i.nickname));
+
+          const localItem = localMap[key];
+          const parts = key.split("__");
+          const parsedRouteId = parts[0] || "ROUTE_6642";
+          const parsedDiff = parts[1] || "easy";
+
+          // 클라우드의 전 세계 최단시간 1위 점령자 및 도전자 수로 100% 실시간 덮어쓰기!
+          localMap[key] = {
+            ...(localItem || {}),
+            routeId: parsedRouteId,
+            difficulty: parsedDiff,
+            occupantNick: top1.nickname,
+            bestMs: top1.best_ms,
+            occupiedSince: top1.created_at || (localItem && localItem.occupiedSince) || new Date().toISOString(),
+            challengerCount: Math.max(uniqueNicks.size, (localItem && localItem.challengerCount) || 1),
+            scores: (localItem && localItem.scores) ? localItem.scores : []
+          };
         });
       }
     }
