@@ -741,7 +741,7 @@ async function syncCloudBoardsToLocal() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2000);
 
-    const res = await fetch(`${SUPABASE_REST_URL}?select=board_id,route_id,difficulty,nickname,best_ms,created_at&order=best_ms.asc&limit=50`, {
+    const res = await fetch(`${SUPABASE_REST_URL}?select=board_id,nickname,best_ms,created_at&order=best_ms.asc&limit=50`, {
       method: "GET",
       headers: {
         "apikey": SUPABASE_REST_KEY,
@@ -760,12 +760,16 @@ async function syncCloudBoardsToLocal() {
           const key = item.board_id;
           if (key && item.nickname) {
             const localItem = localMap[key];
+            const parts = key.split("__");
+            const parsedRouteId = parts[0] || "ROUTE_6642";
+            const parsedDiff = parts[1] || "easy";
+
             if (!localItem || !localItem.bestMs || item.best_ms <= localItem.bestMs || localItem.occupantNick === "미점령 (첫 영주에 도전하세요!)") {
               // 기존 로컬 보드 데이터를 보존하고 클라우드 점령자 정보만 정밀 갱신!
               localMap[key] = {
                 ...(localItem || {}),
-                routeId: item.route_id || key.split("__")[0],
-                difficulty: item.difficulty || key.split("__")[1] || "easy",
+                routeId: parsedRouteId,
+                difficulty: parsedDiff,
                 occupantNick: item.nickname,
                 bestMs: item.best_ms,
                 occupiedSince: item.created_at || (localItem && localItem.occupiedSince) || new Date().toISOString(),
@@ -1055,10 +1059,8 @@ function submitScore({ uid, nickname, routeId, diffKey, totalMs, splits }) {
   boardsMap[boardKey] = board;
   saveBoards(boardsMap);
 
-  // Supabase 비동기 제출
+  // Supabase 비동기 직통 제출
   try {
-    // Supabase Direct REST API에 클라우드 스코어 푸시
-    pushScoreToSupabaseCloud({ routeId, diffKey, nickname, totalMs, splits });
     submitScoreToSupabase({
       routeId,
       difficulty: diffKey,
@@ -1066,8 +1068,8 @@ function submitScore({ uid, nickname, routeId, diffKey, totalMs, splits }) {
       totalMs,
       splits
     });
-  } catch (err) {
-    console.warn("[Supabase Sync Warning]", err);
+  } catch (e) {
+    console.warn("[Supabase Sync Non-fatal Warn]", e);
   }
 
   return {
