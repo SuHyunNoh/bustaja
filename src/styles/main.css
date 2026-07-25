@@ -467,7 +467,7 @@
   box-shadow: var(--pixel-shadow-sm);
 }
 
-/* 4. 게임 화면 (GameScreen) */
+/* 4. 게임 화면 (GameScreen) - 상단 HUD 고정 높이 적용 (타이머/뱃지 텍스트 널뛰기로 인한 줄밀림/위아래 진동 100% 원천 방지) */
 .game-hud {
   display: flex;
   justify-content: space-between;
@@ -475,24 +475,39 @@
   background: var(--pixel-bg-input);
   border: 3px solid #110e17;
   border-radius: 6px;
-  padding: 10px 14px;
+  padding: 8px 14px;
   margin-bottom: 12px;
+  height: 54px;
+  min-height: 54px;
+  max-height: 54px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .timer-display {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: bold;
   color: var(--pixel-mint);
   text-shadow: 1px 1px 0 #110e17;
+  height: 24px;
+  line-height: 24px;
+  white-space: nowrap;
 }
 
 .ghost-delta-badge {
-  font-size: 12px;
+  font-size: 11px;
   padding: 4px 8px;
   border: 2px solid #110e17;
   border-radius: 4px;
   background: #2b253b;
   font-weight: bold;
+  white-space: nowrap;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 28px;
+  line-height: 18px;
+  box-sizing: border-box;
 }
 .ghost-delta-badge.ahead { color: var(--pixel-mint); border-color: var(--pixel-mint); }
 .ghost-delta-badge.behind { color: var(--danger); border-color: var(--danger); }
