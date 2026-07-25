@@ -100,26 +100,34 @@ export async function syncCloudBoardsToLocal() {
         // 2. 각 board_id 별 최단시간 1위 점령자 및 유니크 도전자 수 정밀 계산
         Object.keys(boardGroups).forEach(key => {
           const items = boardGroups[key];
-          items.sort((a, b) => a.best_ms - b.best_ms); // 최단시간 1위 정렬
-          const top1 = items[0];
-          const uniqueNicks = new Set(items.map(i => i.nickname));
+          // 3초 이하 비정상 0초 오염 레코드 자동 필터링!
+          const validItems = items.filter(i => i.best_ms > 3000);
+          if (validItems.length === 0) return;
+
+          validItems.sort((a, b) => a.best_ms - b.best_ms); // 최단시간 1위 정렬
+          const top1 = validItems[0];
+          const uniqueNicks = new Set(validItems.map(i => i.nickname));
 
           const localItem = localMap[key];
           const parts = key.split("__");
           const parsedRouteId = parts[0] || "ROUTE_6642";
           const parsedDiff = parts[1] || "easy";
 
-          // 클라우드의 전 세계 최단시간 1위 점령자 및 도전자 수로 100% 실시간 덮어쓰기!
-          localMap[key] = {
-            ...(localItem || {}),
-            routeId: parsedRouteId,
-            difficulty: parsedDiff,
-            occupantNick: top1.nickname,
-            bestMs: top1.best_ms,
-            occupiedSince: top1.created_at || (localItem && localItem.occupiedSince) || new Date().toISOString(),
-            challengerCount: Math.max(uniqueNicks.size, (localItem && localItem.challengerCount) || 1),
-            scores: (localItem && localItem.scores) ? localItem.scores : []
-          };
+          const isLocalCorrupted = !localItem || !localItem.bestMs || localItem.bestMs <= 3000 || localItem.occupantNick === "버스기사G";
+
+          // 로컬 데이터가 0초 오염이거나 클라우드 기록이 더 빠르면 100% 강제 교체!
+          if (isLocalCorrupted || top1.best_ms <= localItem.bestMs) {
+            localMap[key] = {
+              ...(localItem || {}),
+              routeId: parsedRouteId,
+              difficulty: parsedDiff,
+              occupantNick: top1.nickname,
+              bestMs: top1.best_ms,
+              occupiedSince: top1.created_at || (localItem && localItem.occupiedSince) || new Date().toISOString(),
+              challengerCount: Math.max(uniqueNicks.size, 1),
+              scores: (localItem && localItem.scores) ? localItem.scores : []
+            };
+          }
         });
       }
     }
