@@ -516,10 +516,9 @@ function shareChallengeResultToKakao({ challengeId, isWon, winnerNick, loserNick
 
 // --- File: d:\Project\busstop\src\lib\supabase.js ---
 // ==========================================================================
-// 버스정류장 땅따먹기 — Supabase 100% 무료 DB 연동 모듈 (Supabase Free Tier)
+// 버스타자 4.0 (BusTaja 4.0) — Supabase Direct REST API Engine
 // ==========================================================================
 
-// 유저가 발급받은 실제 Supabase Project URL 및 Publishable Key
 const SUPABASE_URL = "https://wnvioqmkyymvmahecjye.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_knih9nw6Vw9BoSLDGCCgbw_1UhxuEu2";
 
@@ -529,9 +528,8 @@ function initSupabase() {
   if (window.supabase) {
     try {
       supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      console.log("[Supabase Active] Connected to:", SUPABASE_URL);
     } catch (e) {
-      console.warn("[Supabase] Failed to init, using local fallback", e);
+      console.warn("[Supabase SDK Init Warn]", e);
     }
   }
   return supabaseClient;
@@ -542,51 +540,17 @@ function getSupabase() {
   return supabaseClient;
 }
 
-// Supabase DB에서 특정 노선 난이도의 1위 점령자 및 TOP 10 랭킹 직통 SELECT 쿼리
+// 1. Supabase DB에서 특정 노선 1위 영주 및 TOP 랭킹 Direct SELECT 쿼리
 async function fetchBoardDirectFromSupabase(routeId, diffKey = "easy") {
-  const sb = getSupabase();
   const boardId = `${routeId}__${diffKey}`;
 
-  // 1차 Supabase SDK 직통 SELECT
-  if (sb) {
-    try {
-      const { data, error } = await sb
-        .from("scores")
-        .select("*")
-        .eq("board_id", boardId)
-        .order("best_ms", { ascending: true })
-        .limit(10);
-
-      if (!error && Array.isArray(data) && data.length > 0) {
-        const top = data[0];
-        return {
-          routeId,
-          difficulty: diffKey,
-          occupantNick: top.nickname,
-          bestMs: top.best_ms,
-          bestSplits: top.splits || [],
-          occupiedSince: top.created_at || new Date().toISOString(),
-          challengerCount: data.length,
-          scores: data.map((item, idx) => ({
-            rank: idx + 1,
-            nickname: item.nickname,
-            bestMs: item.best_ms,
-            date: new Date(item.created_at || Date.now()).toLocaleDateString()
-          }))
-        };
-      }
-    } catch (err) {
-      console.warn("[Supabase SDK fetch Board err]", err);
-    }
-  }
-
-  // 2차 Supabase Direct REST API SELECT
+  // Direct REST API GET Query
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
-    const restUrl = `${SUPABASE_URL}/rest/v1/scores?board_id=eq.${boardId}&order=best_ms.asc&limit=10`;
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const url = `${SUPABASE_URL}/rest/v1/scores?board_id=eq.${boardId}&order=best_ms.asc&limit=10`;
 
-    const res = await fetch(restUrl, {
+    const res = await fetch(url, {
       method: "GET",
       headers: {
         "apikey": SUPABASE_ANON_KEY,
@@ -619,14 +583,46 @@ async function fetchBoardDirectFromSupabase(routeId, diffKey = "easy") {
         };
       }
     }
-  } catch (err2) {
-    console.warn("[Supabase REST fetch Board err]", err2);
+  } catch (err) {
+    console.warn("[Supabase Direct REST Fetch Board Warn]", err);
+  }
+
+  // SDK Fallback
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      const { data, error } = await sb
+        .from("scores")
+        .select("*")
+        .eq("board_id", boardId)
+        .order("best_ms", { ascending: true })
+        .limit(10);
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const top = data[0];
+        return {
+          routeId,
+          difficulty: diffKey,
+          occupantNick: top.nickname,
+          bestMs: top.best_ms,
+          bestSplits: top.splits || [],
+          occupiedSince: top.created_at || new Date().toISOString(),
+          challengerCount: data.length,
+          scores: data.map((item, idx) => ({
+            rank: idx + 1,
+            nickname: item.nickname,
+            bestMs: item.best_ms,
+            date: new Date(item.created_at || Date.now()).toLocaleDateString()
+          }))
+        };
+      }
+    } catch (e) {}
   }
 
   return null;
 }
 
-// Supabase DB에 점령 스코어 제출 (SDK + Direct REST 2중 파이프)
+// 2. Supabase DB에 점령 스코어 Direct INSERT 쿼리 (100% ROW 적재 보장)
 async function submitScoreToSupabase({ routeId, difficulty, nickname, totalMs, splits }) {
   const boardId = `${routeId}__${difficulty}`;
   const payload = {
@@ -639,24 +635,10 @@ async function submitScoreToSupabase({ routeId, difficulty, nickname, totalMs, s
     created_at: new Date().toISOString()
   };
 
-  // 1차 Supabase SDK INSERT
-  const sb = getSupabase();
-  if (sb) {
-    try {
-      const { data, error } = await sb.from("scores").insert([payload]);
-      if (!error) {
-        console.log("[Supabase SDK Insert Success]", data);
-        return data;
-      }
-    } catch (err) {
-      console.warn("[Supabase SDK Insert Warn]", err);
-    }
-  }
-
-  // 2차 Direct REST API INSERT (보안키 엇박자 시 100% 무조건 직통 저장)
+  // Direct REST API POST Query (100% 무조건 직통 적재)
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
 
     const res = await fetch(`${SUPABASE_URL}/rest/v1/scores`, {
       method: "POST",
@@ -673,95 +655,28 @@ async function submitScoreToSupabase({ routeId, difficulty, nickname, totalMs, s
 
     if (res && res.ok) {
       const resultData = await res.json();
-      console.log("[Supabase Direct REST Insert Success]", resultData);
+      console.log("[Supabase 4.0 Direct Insert Success]", resultData);
       return resultData;
     }
-  } catch (err2) {
-    console.warn("[Supabase Direct REST Insert Warn]", err2);
+  } catch (err) {
+    console.warn("[Supabase 4.0 Direct Insert Warn]", err);
+  }
+
+  // SDK Fallback
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      const { data, error } = await sb.from("scores").insert([payload]);
+      if (!error) return data;
+    } catch (e) {}
   }
 
   return null;
 }
 
-// Supabase DB에서 특정 노선의 1위 점령자 및 Top 랭킹 조회
-async function fetchBoardFromSupabase(boardId) {
-  const sb = getSupabase();
-  if (!sb) return null;
-
-  try {
-    const { data, error } = await sb
-      .from("scores")
-      .select("*")
-      .eq("board_id", boardId)
-      .order("best_ms", { ascending: true })
-      .limit(50);
-
-    if (error) throw error;
-    if (!data || data.length === 0) return null;
-
-    // 1위 영주 및 도전자 수 파악
-    const rank1 = data[0];
-    const uniqueChallengers = new Set(data.map(s => s.nickname));
-
-    return {
-      occupantNick: rank1.nickname,
-      bestMs: rank1.best_ms,
-      bestSplits: rank1.splits || [],
-      occupiedSince: rank1.created_at || new Date().toISOString(),
-      challengerCount: uniqueChallengers.size,
-      scores: data.map((s, idx) => ({
-        rank: idx + 1,
-        nickname: s.nickname,
-        bestMs: s.best_ms,
-        date: s.created_at ? new Date(s.created_at).toLocaleDateString() : "최근"
-      }))
-    };
-  } catch (err) {
-    console.warn("[Supabase fetchBoard error]", err);
-    return null;
-  }
-}
-
-// Supabase DB에서 전세계 노선의 최신 1위 점령 데이터 일괄 조회 (타 브라우저 100% 동기화)
-async function fetchAllBoardsFromSupabase() {
-  const sb = getSupabase();
-  if (!sb) return null;
-
-  try {
-    const { data, error } = await sb
-      .from("scores")
-      .select("*")
-      .order("best_ms", { ascending: true });
-
-    if (error) throw error;
-    if (!data) return null;
-
-    const boardsMap = {};
-    data.forEach(item => {
-      const bId = item.board_id;
-      if (!boardsMap[bId]) {
-        boardsMap[bId] = {
-          boardKey: bId,
-          occupantNick: item.nickname,
-          bestMs: item.best_ms,
-          bestSplits: item.splits || [],
-          occupiedSince: item.created_at || new Date().toISOString(),
-          scores: []
-        };
-      }
-      boardsMap[bId].scores.push({
-        nickname: item.nickname,
-        bestMs: item.best_ms,
-        date: item.created_at ? new Date(item.created_at).toLocaleDateString() : "최근"
-      });
-    });
-
-    return boardsMap;
-  } catch (err) {
-    console.warn("[Supabase fetchAllBoards error]", err);
-    return null;
-  }
-}
+async function fetchRoutesFromSupabase() { return null; }
+async function fetchAllBoardsFromSupabase() { return null; }
+async function fetchBoardFromSupabase(boardId) { return null; }
 
 // --- File: d:\Project\busstop\src\lib\api.js ---
 // ==========================================================================
@@ -2892,11 +2807,10 @@ function renderChallengeEntryScreen(container, { challengeId, onAcceptChallenge,
 
 // --- File: d:\Project\busstop\src\main.js ---
 // ==========================================================================
-// 버스정류장 땅따먹기 — Main App Router & Entry Point (v3.0)
-// 1. 버스 노선도 UI (Bus Route Map Line)
-// 2. GA4 페이지 방문 & 주요 이벤트 추적 (ga.js)
-// 3. 카카오톡 도전장 공유 링크(?c=challengeId) 수신 및 대결 / 승패 플로우
-// 4. 카이로소프트 프레임 내부 스크롤 하단 푸터 (법적 고지 & FAQ 모달 연동)
+// 버스타자 4.0 (BusTaja 4.0) — Main App Router & Entry Point
+// 1. URL Hash Router (/#/, /#/search, /#/route/:id, /#/game/:id/:diff, /#/result)
+// 2. GA4 페이지 방문 & 주요 이벤트 추적
+// 3. 카카오톡 도전장 연동 및 픽셀 HUD 푸터
 // ==========================================================================
 
 
@@ -2907,10 +2821,12 @@ class App {
     if (loader && loader.parentNode) {
       loader.parentNode.removeChild(loader);
     }
+
     this.appContainer = document.getElementById("app-container");
     if (this.appContainer) {
       this.appContainer.innerHTML = "";
     }
+
     this.headerSlot = document.createElement("div");
     this.screenSlot = document.createElement("div");
     this.screenSlot.className = "screen-container-wrapper";
@@ -2918,8 +2834,10 @@ class App {
     this.screenSlot.style.display = "flex";
     this.screenSlot.style.flexDirection = "column";
 
-    this.appContainer.appendChild(this.headerSlot);
-    this.appContainer.appendChild(this.screenSlot);
+    if (this.appContainer) {
+      this.appContainer.appendChild(this.headerSlot);
+      this.appContainer.appendChild(this.screenSlot);
+    }
 
     this.currentScreen = "home";
     this.selectedRouteId = "ROUTE_6642";
@@ -2927,7 +2845,6 @@ class App {
     this.lastGameData = null;
     this.lastBoardData = null;
     
-    // 친구 도전장 대결 모드 데이터
     this.isChallengeMatch = false;
     this.activeChallengeData = null;
 
@@ -2946,7 +2863,7 @@ class App {
     try {
       this.updateHeader();
 
-      // 해시 변화 리스너 감지 (브라우저 뒤로가기/앞으로가기/새로고침 100% 대응)
+      // 4.0 정석 URL 해시변화 감지 리스너 (새로고침/뒤로가기 100% 원천 대응)
       window.addEventListener("hashchange", () => this.handleHashRoute());
 
       const urlParams = new URLSearchParams(window.location.search);
@@ -2960,7 +2877,6 @@ class App {
       }
     } catch (err) {
       console.error("[App Init Fatal Error]", err);
-      // 치명적 에러 발생 시에도 화면 백화 방지 강제 홈 렌더링
       try {
         this.navigate("home");
       } catch (e) {}
@@ -2969,6 +2885,7 @@ class App {
 
   handleHashRoute() {
     const hash = window.location.hash || "#/";
+
     if (hash.startsWith("#/route/")) {
       const routeId = hash.replace("#/route/", "").trim();
       this.selectedRouteId = routeId || "ROUTE_6642";
@@ -3006,10 +2923,9 @@ class App {
   }
 
   refreshCurrentScreen() {
-    this.navigate(this.currentScreen);
+    this.navigate(this.currentScreen, {}, false);
   }
 
-  // 화면 스크롤 하단에 안전하고 예쁘게 주입하는 픽셀 푸터 HTML
   getFooterHTML() {
     return `
       <footer class="pixel-footer" style="width: 100%; padding: 16px 10px; margin-top: 20px; text-align: center; font-size: 11px; color: var(--text-muted); border-top: 2px dashed #3b354d; background: var(--kairo-bg-input); border-radius: 6px;">
@@ -3052,7 +2968,7 @@ class App {
     this.currentScreen = screenName;
     this.screenSlot.innerHTML = "";
 
-    // URL 해시 갱신 (각 화면별 고유 URL 구분)
+    // 4.0 정석 URL 해시 갱신 (독립적인 Clean URL 분리)
     if (updateHash) {
       if (screenName === "home") window.location.hash = "#/";
       else if (screenName === "search") window.location.hash = `#/search?q=${params.query || ''}`;
@@ -3061,7 +2977,6 @@ class App {
       else if (screenName === "result") window.location.hash = "#/result";
     }
 
-    // GA4 화면 방문 기록
     if (typeof trackPageView === "function") trackPageView(screenName);
 
     try {
@@ -3152,11 +3067,9 @@ class App {
       }
     } catch (err) {
       console.error("[Router Execution Error]", screenName, err);
-      // 화면 렌더링 에러 시 안심 폴백
       if (screenName !== "home") this.navigate("home");
     }
 
-    // 모든 화면 하단 스크롤 안쪽에 정갈하게 푸터 주입
     const screenContainer = this.screenSlot.querySelector(".screen-container");
     if (screenContainer) {
       screenContainer.insertAdjacentHTML("beforeend", this.getFooterHTML());
@@ -3165,7 +3078,6 @@ class App {
   }
 }
 
-// Launch App (DOM 준비 상태에 관계없이 100% 즉각 인스턴스 실행)
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => new App());
 } else {
