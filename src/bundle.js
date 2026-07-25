@@ -782,26 +782,34 @@ async function syncCloudBoardsToLocal() {
         // 2. 각 board_id 별 최단시간 1위 점령자 및 유니크 도전자 수 정밀 계산
         Object.keys(boardGroups).forEach(key => {
           const items = boardGroups[key];
-          items.sort((a, b) => a.best_ms - b.best_ms); // 최단시간 1위 정렬
-          const top1 = items[0];
-          const uniqueNicks = new Set(items.map(i => i.nickname));
+          // 3초 이하 비정상 0초 오염 레코드 자동 필터링!
+          const validItems = items.filter(i => i.best_ms > 3000);
+          if (validItems.length === 0) return;
+
+          validItems.sort((a, b) => a.best_ms - b.best_ms); // 최단시간 1위 정렬
+          const top1 = validItems[0];
+          const uniqueNicks = new Set(validItems.map(i => i.nickname));
 
           const localItem = localMap[key];
           const parts = key.split("__");
           const parsedRouteId = parts[0] || "ROUTE_6642";
           const parsedDiff = parts[1] || "easy";
 
-          // 클라우드의 전 세계 최단시간 1위 점령자 및 도전자 수로 100% 실시간 덮어쓰기!
-          localMap[key] = {
-            ...(localItem || {}),
-            routeId: parsedRouteId,
-            difficulty: parsedDiff,
-            occupantNick: top1.nickname,
-            bestMs: top1.best_ms,
-            occupiedSince: top1.created_at || (localItem && localItem.occupiedSince) || new Date().toISOString(),
-            challengerCount: Math.max(uniqueNicks.size, (localItem && localItem.challengerCount) || 1),
-            scores: (localItem && localItem.scores) ? localItem.scores : []
-          };
+          const isLocalCorrupted = !localItem || !localItem.bestMs || localItem.bestMs <= 3000 || localItem.occupantNick === "버스기사G";
+
+          // 로컬 데이터가 0초 오염이거나 클라우드 기록이 더 빠르면 100% 강제 교체!
+          if (isLocalCorrupted || top1.best_ms <= localItem.bestMs) {
+            localMap[key] = {
+              ...(localItem || {}),
+              routeId: parsedRouteId,
+              difficulty: parsedDiff,
+              occupantNick: top1.nickname,
+              bestMs: top1.best_ms,
+              occupiedSince: top1.created_at || (localItem && localItem.occupiedSince) || new Date().toISOString(),
+              challengerCount: Math.max(uniqueNicks.size, 1),
+              scores: (localItem && localItem.scores) ? localItem.scores : []
+            };
+          }
         });
       }
     }
@@ -2622,22 +2630,24 @@ function renderResultScreen(container, props = {}) {
           </p>
         `}
       ` : submitRes && submitRes.isOccupied ? `
-        <!-- 일반 모드 점령 성공 연출 -->
+        <!-- 일반 모드 1위 역전 점령 성공 연출 -->
         <div style="font-size: 44px; animation: flagWave 0.6s infinite;">👑🚩</div>
         <div class="result-headline" style="color: var(--kairo-yellow);">
-          NEW LAND OCCUPIED!<br>새로운 점령자 등극!
+          🎉 축하합니다! 새로운 영주가 되었습니다! 👑🚩
         </div>
-        <p style="font-size: 13px; color: var(--kairo-mint); margin-bottom: 20px;">
-          축하합니다! 당신이 ${route.routeNo}번 (${diffSpec.label})의 새로운 영주가 되었습니다!
+        <p style="font-size: 14px; color: var(--kairo-mint); margin-bottom: 20px; font-weight: bold; line-height: 1.6;">
+          노선의 1위 자리를 멋지게 차지하셨습니다!<br>
+          전 세계 플레이어들에게 당신의 이름을 선포합니다! 🏆
         </p>
       ` : `
-        <!-- 일반 모드 완주 연출 -->
-        <div style="font-size: 44px;">🚌🏁</div>
-        <div class="result-headline" style="color: #fff;">
-          FINISH! 완주 성공!
+        <!-- 일반 모드 완주 / 점령 실패 격려 연출 -->
+        <div style="font-size: 44px;">💪🏁</div>
+        <div class="result-headline" style="color: #ffffff;">
+          💪 아쉬워요! 기존 영주의 벽을 넘지 못했습니다.
         </div>
-        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
-          수고하셨습니다! 1위 점령까지 더 빠르게 도전해보세요.
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.6;">
+          0.1초만 더 단축하면 영주 자리를 빼앗을 수 있습니다!<br>
+          <strong style="color: var(--kairo-yellow);">다시 도전해 보세요! 🔄</strong>
         </p>
       `}
 
