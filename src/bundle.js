@@ -1,4 +1,4 @@
-﻿/* BusTaja Standalone Bundle v3.2.0 */
+﻿/* BusTaja Standalone Bundle v3.2.1 */
 // --- File: d:\Project\busstop\src\data\routes.js ---
 // ==========================================================================
 // 버스타자 (BusTaja) — 100% 아름다운 실제 한글 정류소 명칭 버스 노선 DB
@@ -2078,11 +2078,24 @@ function renderRouteDetailScreen(container, { routeId, onStartGame, onBack }) {
     refreshLiveBoard();
     const liveTimer = setInterval(refreshLiveBoard, 3000);
 
-    // 이벤트 바인딩 시 타이머 해제
-    container.querySelector("#btn-detail-back").addEventListener("click", () => {
-      clearInterval(liveTimer);
-      onBack();
-    });
+    // 안심 방어형 이벤트 바인딩 (Null-Safety)
+    const backBtn = container.querySelector("#btn-detail-back");
+    if (backBtn) {
+      backBtn.addEventListener("click", () => {
+        clearInterval(liveTimer);
+        if (typeof onBack === "function") onBack();
+      });
+    }
+
+    const startBtn = container.querySelector("#btn-start-game");
+    if (startBtn) {
+      startBtn.addEventListener("click", () => {
+        clearInterval(liveTimer);
+        if (typeof onStartGame === "function") {
+          onStartGame({ routeId, difficulty: currentDiff, board });
+        }
+      });
+    }
 
     container.querySelectorAll(".diff-tab").forEach(tab => {
       tab.addEventListener("click", (e) => {
