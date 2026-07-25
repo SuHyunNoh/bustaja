@@ -70,11 +70,20 @@
     <p>버스타자(BusTaja)는 서울특별시 및 경기도의 시내버스, 간선버스, 지선버스, 광역버스 노선 정류장을 빠르게 타이핑하여 노선의 영주가 되는 레트로 픽셀 타자 게임입니다.</p>
   </article>
 
-  <!-- 메인 앱 컨테이너 -->
-  <main id="app-container" aria-label="버스타자 앱 메인"></main>
+  <!-- 메인 앱 컨테이너 (정적 픽셀 스켈레톤 탑재로 백화 현상 100% 원천 차단) -->
+  <main id="app-container" aria-label="버스타자 앱 메인">
+    <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #161224; color: #ffffff; font-family: sans-serif; text-align: center; padding: 20px;">
+      <div style="font-size: 48px; margin-bottom: 16px; animation: busBounce 0.6s infinite ease-in-out;">🚌</div>
+      <h1 style="font-size: 22px; color: #facc15; font-weight: bold; margin-bottom: 8px;">버스타자 (BusTaja)</h1>
+      <p style="font-size: 13px; color: #94a3b8; margin-bottom: 20px;">수도권 버스정류장 타자 땅따먹기 로딩 중...</p>
+      <div style="width: 140px; height: 6px; background: #2a253a; border-radius: 3px; overflow: hidden; border: 1px solid #4b4263;">
+        <div style="width: 60%; height: 100%; background: #38bdf8; animation: pulse 1s infinite alternate;"></div>
+      </div>
+    </div>
+  </main>
 
-  <!-- 메인 애플리케이션 모듈 로드 (Guaranteed Launch v3.1.0) -->
-  <script type="module" src="./src/main.js?v=3.1.0"></script>
+  <!-- 메인 애플리케이션 모듈 로드 (Skeleton Fallback v3.1.1) -->
+  <script type="module" src="./src/main.js?v=3.1.1"></script>
 
 </body>
 </html>
