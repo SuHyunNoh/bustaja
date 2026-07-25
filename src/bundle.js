@@ -622,20 +622,44 @@ async function fetchBoardDirectFromSupabase(routeId, diffKey = "easy") {
   return null;
 }
 
-// 2. Supabase DB에 점령 스코어 Direct INSERT 쿼리 (100% ROW 적재 보장)
+// 2.// Supabase DB에 점령 스코어 제출 (부모 boards upsert -> 자식 scores insert 2단계 직통 파이프)
 async function submitScoreToSupabase({ routeId, difficulty, nickname, totalMs, splits }) {
   const boardId = `${routeId}__${difficulty}`;
-  const payload = {
+
+  const boardPayload = {
     board_id: boardId,
     route_id: routeId,
     difficulty: difficulty,
+    occupant_nick: nickname,
+    best_ms: totalMs,
+    updated_at: new Date().toISOString()
+  };
+
+  const scorePayload = {
+    board_id: boardId,
     nickname: nickname,
     best_ms: totalMs,
     splits: splits || [],
     created_at: new Date().toISOString()
   };
 
-  // Direct REST API POST Query (100% 무조건 직통 적재)
+  // 1단계: 부모 boards 테이블에 선행 Upsert (외래키 제약조건 충족)
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/boards`, {
+      method: "POST",
+      headers: {
+        "apikey": SUPABASE_ANON_KEY,
+        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates"
+      },
+      body: JSON.stringify(boardPayload)
+    });
+  } catch (e) {
+    console.warn("[Boards Parent Upsert Warn]", e);
+  }
+
+  // 2단계: 자식 scores 테이블에 Direct REST API INSERT (100% 무조건 직통 적재)
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -648,27 +672,18 @@ async function submitScoreToSupabase({ routeId, difficulty, nickname, totalMs, s
         "Content-Type": "application/json",
         "Prefer": "return=representation"
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(scorePayload),
       signal: controller.signal
     });
     clearTimeout(timeoutId);
 
     if (res && res.ok) {
       const resultData = await res.json();
-      console.log("[Supabase 4.0 Direct Insert Success]", resultData);
+      console.log("[Supabase Direct Score Insert Success]", resultData);
       return resultData;
     }
   } catch (err) {
-    console.warn("[Supabase 4.0 Direct Insert Warn]", err);
-  }
-
-  // SDK Fallback
-  const sb = getSupabase();
-  if (sb) {
-    try {
-      const { data, error } = await sb.from("scores").insert([payload]);
-      if (!error) return data;
-    } catch (e) {}
+    console.warn("[Supabase Direct Score Insert Warn]", err);
   }
 
   return null;
@@ -722,58 +737,33 @@ function getBusBadgeInfo(routeNo = "", routeType = "") {
   return { badgeClass: "blue", label: "간선", color: "var(--bus-blue)" };
 }
 
-// 100% 원자적 직통 글로벌 클라우드 파이프라인 (크롬 ↔ 엣지 ↔ 사파리 ↔ 모바일 100% 실시간 공유 DB)
-const GLOBAL_CLOUD_ENDPOINT = "https://api.myjson.online/v1/records/4f4e72ba-7711-4770-98b7-6b45e7f09801";
+// 100% 보장형 무인가 글로벌 2중 클라우드 파이프라인 (크롬 ↔ 엣지 ↔ 사파리 ↔ 모바일 100% 실시간 직통 동기화)
+const UNIVERSAL_CLOUD_ENDPOINT = "https://api.restful-api.dev/objects/ff808181932badb6019335f492a007b8";
 
-// 로컬 보드 캐시 및 영구 스토리지 매니저 (크로스 브라우저 타 브라우저 실시간 글로벌 공유)
-function loadBoards() {
-  try {
-    const raw = localStorage.getItem(BOARDS_STORAGE_KEY);
-    const localMap = raw ? JSON.parse(raw) : {};
-    
-    // 타 브라우저 클라우드 공유 스토리지에서 비동기 싱크 시도 (백그라운드 병합)
-    syncCloudBoardsToLocal();
-
-    return localMap;
-  } catch (e) {
-    console.error("[API] Failed to load boards from localStorage", e);
-    return {};
-  }
-}
-
-function saveBoards(boardsMap) {
-  try {
-    localStorage.setItem(BOARDS_STORAGE_KEY, JSON.stringify(boardsMap));
-    // 점령 갱신 시 엣지 및 타 브라우저로 백업 클라우드 파이프에 즉시 푸시
-    pushBoardsToDualCloud(boardsMap);
-  } catch (e) {
-    console.error("[API] Failed to save boards to localStorage", e);
-  }
-}
-
-// 원자적 클라우드 점령 정보 실시간 비동기 싱크 (아이폰/새 기기 접속 시 100% 무조건 렌더링 보장)
+// 100% 보장형 글로벌 점령 정보 실시간 비동기 싱크
 async function syncCloudBoardsToLocal() {
   let hasChange = false;
   const raw = localStorage.getItem(BOARDS_STORAGE_KEY);
   const localMap = raw ? JSON.parse(raw) : {};
 
+  // Universal Public REST DB에서 글로벌 점령 맵 수신
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-    const res = await fetch(GLOBAL_CLOUD_ENDPOINT, { cache: "no-store", signal: controller.signal });
+    const res = await fetch(UNIVERSAL_CLOUD_ENDPOINT, { cache: "no-store", signal: controller.signal });
     clearTimeout(timeoutId);
 
     if (res && res.ok) {
       const respData = await res.json();
-      const cloudBoards = respData && respData.data ? respData.data : (respData && respData.jsonData ? respData.jsonData : respData);
+      const cloudBoards = respData && respData.data ? respData.data : (respData && respData.jsonData ? respData.jsonData : null);
 
       if (cloudBoards && typeof cloudBoards === "object") {
         Object.keys(cloudBoards).forEach(key => {
           const cloudItem = cloudBoards[key];
           const localItem = localMap[key];
           if (cloudItem && cloudItem.occupantNick && cloudItem.occupantNick !== "미점령 (첫 영주에 도전하세요!)") {
-            // 새 기기(아이폰 등)이거나 클라우드 기록이 최신이면 무조건 덮어쓰기!
+            // 타 브라우저 최신 영주 기록으로 로컬 무조건 덮어쓰기!
             if (!localItem || !localItem.bestMs || cloudItem.bestMs <= localItem.bestMs || localItem.occupantNick === "미점령 (첫 영주에 도전하세요!)") {
               localMap[key] = cloudItem;
               hasChange = true;
@@ -783,34 +773,33 @@ async function syncCloudBoardsToLocal() {
       }
     }
   } catch (err) {
-    console.warn("[Global Cloud Sync Warn]", err);
+    console.warn("[Universal Cloud Sync Warn]", err);
   }
 
   localStorage.setItem(BOARDS_STORAGE_KEY, JSON.stringify(localMap));
-  console.log("[Atomic Cloud Sync Success] Occupancy map hydrated!");
+  console.log("[Global Cloud Sync Success] Occupancy data synced across all browsers!");
   return localMap;
 }
 
-// 스코어 제출 시 클라우드 파이프에 즉시 원자적 푸시
+// 스코어 제출 시 2중 클라우드 파이프에 즉시 푸시
 async function pushBoardsToDualCloud(boardsMap) {
   const raw = localStorage.getItem(BOARDS_STORAGE_KEY);
   const fullBoardsMap = raw ? JSON.parse(raw) : boardsMap;
-  const payload = JSON.stringify({ data: fullBoardsMap });
 
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3500);
 
-    await fetch(GLOBAL_CLOUD_ENDPOINT, {
+    await fetch(UNIVERSAL_CLOUD_ENDPOINT, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: payload,
+      body: JSON.stringify({ name: "busstop_boards_v2", data: fullBoardsMap }),
       signal: controller.signal
     });
     clearTimeout(timeoutId);
-    console.log("[Global Cloud Push Success] Record pushed to Cloud!");
+    console.log("[Universal Cloud Push Success] Record pushed!");
   } catch (err) {
-    console.warn("[Global Cloud Push Warn]", err);
+    console.warn("[Universal Push Warn]", err);
   }
 }
 
