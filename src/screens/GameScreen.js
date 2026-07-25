@@ -158,7 +158,8 @@ export function renderGameScreen(container, { routeId, difficulty, board, isChal
       playerBusEl.style.left = `${state.progressPercent}%`;
       playerStopCountEl.textContent = `내 진행: ${state.currentIndex} / ${targetStops.length}`;
 
-      // 노선도 맵 스크롤 및 노드 active/passed 처리 (진동 방지: currentIndex 변경 시에만 스크롤)
+      // 노선도 맵 스크롤 및 노드 active/passed 처리 (화면 떨림/진동 100% 원천 차단)
+      const mapContainer = container.querySelector("#bus-route-map-container");
       targetStops.forEach((_, idx) => {
         const stopItemEl = container.querySelector(`#map-stop-item-${idx}`);
         if (stopItemEl) {
@@ -170,8 +171,11 @@ export function renderGameScreen(container, { routeId, difficulty, board, isChal
             stopItemEl.className = "route-stop-item active";
             if (!stopItemEl.querySelector(".active-stop-flag-tag")) {
               stopItemEl.insertAdjacentHTML("beforeend", '<span class="active-stop-flag-tag">🚩 현재 정류장</span>');
-              // 정류장이 다음으로 넘어갔을 때만 1회 부드럽게 스크롤 (매 프레임 연속 호출로 인한 위아래 진동 원천 차단)
-              stopItemEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+              // 전체 윈도우 스크롤에 영향을 주지 않고, 오직 노선도 박스 내부만 조용히 얌전하게 위치 이동 (진동 0%)
+              if (mapContainer) {
+                const targetOffset = stopItemEl.offsetTop - mapContainer.offsetTop - 40;
+                mapContainer.scrollTop = Math.max(0, targetOffset);
+              }
             }
           } else {
             stopItemEl.className = "route-stop-item";
