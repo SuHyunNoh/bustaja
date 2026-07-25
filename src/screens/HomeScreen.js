@@ -4,6 +4,7 @@
 // ==========================================================================
 
 import { getLongestOccupantNews, getBoardByRouteAndDiff, getBusBadgeInfo, syncCloudBoardsToLocal } from "../lib/api.js";
+import { fetchBoardDirectFromSupabase } from "../lib/supabase.js";
 import { LOCAL_ROUTES } from "../data/routes.js";
 import { showFaqModal } from "../ui/modal.js";
 import { renderAuthModal } from "./AuthScreen.js";
@@ -207,26 +208,41 @@ export function renderHomeScreen(container, { onStartClick, onAuthClick, onSelec
     }
   }, 3600000);
 
-  // 3초 간격 크로스 브라우저 실시간 자동 동기화 폴링 (엣지에서 완주 시 크롬에 손 안 대고 3초 내 자동 반영!)
-  const liveSyncInterval = setInterval(() => {
-    syncCloudBoardsToLocal().then(updated => {
-      if (updated) {
-        const updatedHotRoutes = getHotRoutes();
-        const listEl = container.querySelector("#hot-routes-list-container");
-        if (listEl) {
-          listEl.innerHTML = renderHotRoutesHTML(updatedHotRoutes);
-          bindHotRouteEvents();
+  // 4초 간격 클라우드 Direct Fetch (A안: 핫 노선 상위 5개 클라우드 1등/도전자 수 즉시 실시간 반영)
+  const refreshHotRoutesDirectFromCloud = async () => {
+    try {
+      await syncCloudBoardsToLocal();
+      const hotList = getHotRoutes();
+
+      // 상위 5개 노선에 대해 클라우드에서 직접 dedup 랭킹 수신
+      const cloudPromises = hotList.map(r => fetchBoardDirectFromSupabase(r.routeId, "easy"));
+      const cloudBoards = await Promise.all(cloudPromises);
+
+      cloudBoards.forEach((cb, idx) => {
+        if (cb && cb.occupantNick) {
+          hotList[idx].occupant = cb.occupantNick;
+          hotList[idx].challengers = cb.challengerCount || 1;
+          if (cb.bestMs) {
+            hotList[idx].bestMs = cb.bestMs;
+            hotList[idx].diffSec = `${(cb.bestMs / 1000).toFixed(2)}초 기록`;
+            hotList[idx].status = "🔥 영주 사수 중";
+          }
         }
-        const newsEl = container.querySelector("#home-news-text");
-        if (newsEl) {
-          const updatedNews = getLongestOccupantNews();
-          newsEl.textContent = updatedNews.isDefault 
-            ? '[시내버스 속보] 6642번 노선을 완주하고 첫 번째 영주가 되어보세요! ✨' 
-            : `[시내버스 속보] ${updatedNews.routeNo}번 노선, '${updatedNews.occupantNick}' 님 ${updatedNews.occupiedDays}일째 장기 점령 중! ✨`;
-        }
+      });
+
+      const listEl = container.querySelector("#hot-routes-list-container");
+      if (listEl) {
+        listEl.innerHTML = renderHotRoutesHTML(hotList);
+        bindHotRouteEvents();
       }
-    });
-  }, 3000);
+    } catch (e) {
+      console.warn("[HomeScreen Cloud Refresh Warn]", e);
+    }
+  };
+
+  // 즉시 1회 실행 후 4초 폴링
+  refreshHotRoutesDirectFromCloud();
+  const liveSyncInterval = setInterval(refreshHotRoutesDirectFromCloud, 4000);
 
   // 이벤트 바인딩 시 인터벌 해제 포함
   const clearAllTimers = () => {
