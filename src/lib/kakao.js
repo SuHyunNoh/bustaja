@@ -27,7 +27,7 @@ export function shareChallengeToKakao({ challengeId, routeNo, routeType, diffLab
 
   const shareTitle = `[${routeNo}번 · ${diffLabel}] 🚌 ${senderNick}의 도전장 도착!`;
   const shareDesc = `내 완주 기록 ${totalTimeStr}! 이 버스 노선의 주인, 나를 깰 수 있어? 🚩`;
-  const origin = window.location.origin && window.location.origin !== "null" ? window.location.origin : "https://busstop-azure.vercel.app";
+  const origin = window.location.origin && window.location.origin !== "null" ? window.location.origin : "https://bustaja.vercel.app";
   const targetUrl = `${origin}${window.location.pathname}?c=${challengeId}`;
   const imageUrl = `${origin}/og_thumbnail.jpg`;
 
