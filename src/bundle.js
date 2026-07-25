@@ -402,7 +402,7 @@ function shareChallengeToKakao({ challengeId, routeNo, routeType, diffLabel, sen
 
   const shareTitle = `[${routeNo}번 · ${diffLabel}] 🚌 ${senderNick}의 도전장 도착!`;
   const shareDesc = `내 완주 기록 ${totalTimeStr}! 이 버스 노선의 주인, 나를 깰 수 있어? 🚩`;
-  const origin = window.location.origin && window.location.origin !== "null" ? window.location.origin : "https://busstop-azure.vercel.app";
+  const origin = window.location.origin && window.location.origin !== "null" ? window.location.origin : "https://bustaja.vercel.app";
   const targetUrl = `${origin}${window.location.pathname}?c=${challengeId}`;
   const imageUrl = `${origin}/og_thumbnail.jpg`;
 
@@ -622,18 +622,9 @@ async function fetchBoardDirectFromSupabase(routeId, diffKey = "easy") {
   return null;
 }
 
-// 2.// Supabase DB에 점령 스코어 제출 (부모 boards upsert -> 자식 scores insert 2단계 직통 파이프)
+// Supabase DB에 점령 스코어 제출 (scores 단독 100% 무조건 직통 INSERT 파이프)
 async function submitScoreToSupabase({ routeId, difficulty, nickname, totalMs, splits }) {
   const boardId = `${routeId}__${difficulty}`;
-
-  const boardPayload = {
-    board_id: boardId,
-    route_id: routeId,
-    difficulty: difficulty,
-    occupant_nick: nickname,
-    best_ms: totalMs,
-    updated_at: new Date().toISOString()
-  };
 
   const scorePayload = {
     board_id: boardId,
@@ -643,23 +634,7 @@ async function submitScoreToSupabase({ routeId, difficulty, nickname, totalMs, s
     created_at: new Date().toISOString()
   };
 
-  // 1단계: 부모 boards 테이블에 선행 Upsert (외래키 제약조건 충족)
-  try {
-    await fetch(`${SUPABASE_URL}/rest/v1/boards`, {
-      method: "POST",
-      headers: {
-        "apikey": SUPABASE_ANON_KEY,
-        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-        "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates"
-      },
-      body: JSON.stringify(boardPayload)
-    });
-  } catch (e) {
-    console.warn("[Boards Parent Upsert Warn]", e);
-  }
-
-  // 2단계: 자식 scores 테이블에 Direct REST API INSERT (100% 무조건 직통 적재)
+  // Direct REST API INSERT (외래키 걸림 0% 단독 100% 무조건 직통 적재)
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
