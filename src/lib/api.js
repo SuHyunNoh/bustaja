@@ -43,6 +43,22 @@ export function getBusBadgeInfo(routeNo = "", routeType = "") {
   return { badgeClass: "blue", label: "간선", color: "var(--bus-blue)" };
 }
 
+// 안전한 로컬 보드 맵 로더 및 저장소 (ReferenceError 원천 방지)
+export function loadBoards() {
+  try {
+    const raw = localStorage.getItem(BOARDS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+export function saveBoards(boardsMap) {
+  try {
+    localStorage.setItem(BOARDS_STORAGE_KEY, JSON.stringify(boardsMap));
+  } catch (e) {}
+}
+
 // Supabase Direct REST Endpoint (404/MIME 에러 위험 0% 통과 퍼블릭 API)
 const SUPABASE_REST_URL = "https://wnvioqmkyymvmahecjye.supabase.co/rest/v1/scores";
 const SUPABASE_REST_KEY = "sb_publishable_knih9nw6Vw9BoSLDGCCgbw_1UhxuEu2";
