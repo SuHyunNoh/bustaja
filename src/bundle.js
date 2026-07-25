@@ -626,32 +626,61 @@ async function fetchBoardDirectFromSupabase(routeId, diffKey = "easy") {
   return null;
 }
 
-// Supabase DB에 점령 스코어 제출
+// Supabase DB에 점령 스코어 제출 (SDK + Direct REST 2중 파이프)
 async function submitScoreToSupabase({ routeId, difficulty, nickname, totalMs, splits }) {
-  const sb = getSupabase();
-  if (!sb) return null;
+  const boardId = `${routeId}__${difficulty}`;
+  const payload = {
+    board_id: boardId,
+    route_id: routeId,
+    difficulty: difficulty,
+    nickname: nickname,
+    best_ms: totalMs,
+    splits: splits || [],
+    created_at: new Date().toISOString()
+  };
 
-  try {
-    const boardId = `${routeId}__${difficulty}`;
-    const { data, error } = await sb
-      .from("scores")
-      .insert([
-        {
-          board_id: boardId,
-          nickname,
-          best_ms: totalMs,
-          splits,
-          created_at: new Date().toISOString()
-        }
-      ]);
-    
-    if (error) throw error;
-    console.log("[Supabase Score Submitted Successfully]", data);
-    return data;
-  } catch (err) {
-    console.warn("[Supabase submitScore error]", err);
-    return null;
+  // 1차 Supabase SDK INSERT
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      const { data, error } = await sb.from("scores").insert([payload]);
+      if (!error) {
+        console.log("[Supabase SDK Insert Success]", data);
+        return data;
+      }
+    } catch (err) {
+      console.warn("[Supabase SDK Insert Warn]", err);
+    }
   }
+
+  // 2차 Direct REST API INSERT (보안키 엇박자 시 100% 무조건 직통 저장)
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/scores`, {
+      method: "POST",
+      headers: {
+        "apikey": SUPABASE_ANON_KEY,
+        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (res && res.ok) {
+      const resultData = await res.json();
+      console.log("[Supabase Direct REST Insert Success]", resultData);
+      return resultData;
+    }
+  } catch (err2) {
+    console.warn("[Supabase Direct REST Insert Warn]", err2);
+  }
+
+  return null;
 }
 
 // Supabase DB에서 특정 노선의 1위 점령자 및 Top 랭킹 조회
