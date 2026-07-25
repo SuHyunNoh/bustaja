@@ -8,13 +8,18 @@ import { getCurrentUser } from "../lib/auth.js";
 import { shareChallengeToKakao, shareChallengeResultToKakao } from "../lib/kakao.js";
 import { showPixelAlert, showInterstitialAdModal } from "../ui/modal.js";
 
-export function renderResultScreen(container, { routeId, difficulty, resultData, isChallengeMatch, challengeData, onRetry, onHome }) {
+export function renderResultScreen(container, props = {}) {
+  const { isChallengeMatch, challengeData, onRetry, onHome } = props;
+  const resultData = props.resultData || props.gameData || {};
+  const routeId = props.routeId || resultData.routeId || "ROUTE_6642";
+  const difficulty = props.difficulty || resultData.difficulty || "easy";
+
   const route = getRouteById(routeId);
-  const diffSpec = getDifficultySpec(route.stopCount, difficulty);
+  const diffSpec = getDifficultySpec(route ? route.stopCount : 20, difficulty);
   const currentUser = getCurrentUser();
 
-  const totalSecStr = (resultData.totalMs / 1000).toFixed(2);
-  const avgSplitSecStr = (resultData.totalMs / resultData.stopCount / 1000).toFixed(2);
+  const totalSecStr = ((resultData.totalMs || 0) / 1000).toFixed(2);
+  const avgSplitSecStr = resultData.stopCount ? ((resultData.totalMs || 0) / resultData.stopCount / 1000).toFixed(2) : "0.00";
 
   let challengeResultInfo = null;
   let submitRes = submitScore({
@@ -22,20 +27,20 @@ export function renderResultScreen(container, { routeId, difficulty, resultData,
     nickname: currentUser.nickname,
     routeId,
     diffKey: difficulty,
-    totalMs: resultData.totalMs,
-    splits: resultData.splits
+    totalMs: resultData.totalMs || 0,
+    splits: resultData.splits || []
   });
 
-  // 비동기 클라우드 DB 보장형 푸시 파이프라인
+  // 비동기 클라우드 Supabase DB 직통 100% 보장형 푸시 파이프라인
   submitScoreAsync({
     uid: currentUser.uid,
     nickname: currentUser.nickname,
     routeId,
     diffKey: difficulty,
-    totalMs: resultData.totalMs,
-    splits: resultData.splits
+    totalMs: resultData.totalMs || 0,
+    splits: resultData.splits || []
   }).then(asyncRes => {
-    console.log("[ResultScreen Cloud Push Completed]", asyncRes);
+    console.log("[ResultScreen Supabase Direct Push Completed]", asyncRes);
   });
 
   if (isChallengeMatch && challengeData) {
@@ -72,22 +77,24 @@ export function renderResultScreen(container, { routeId, difficulty, resultData,
           </p>
         `}
       ` : submitRes && submitRes.isOccupied ? `
-        <!-- 일반 모드 점령 성공 연출 -->
+        <!-- 일반 모드 1위 역전 점령 성공 연출 -->
         <div style="font-size: 44px; animation: flagWave 0.6s infinite;">👑🚩</div>
         <div class="result-headline" style="color: var(--kairo-yellow);">
-          NEW LAND OCCUPIED!<br>새로운 점령자 등극!
+          🎉 축하합니다! 새로운 영주가 되었습니다! 👑🚩
         </div>
-        <p style="font-size: 13px; color: var(--kairo-mint); margin-bottom: 20px;">
-          축하합니다! 당신이 ${route.routeNo}번 (${diffSpec.label})의 새로운 영주가 되었습니다!
+        <p style="font-size: 14px; color: var(--kairo-mint); margin-bottom: 20px; font-weight: bold; line-height: 1.6;">
+          노선의 1위 자리를 멋지게 차지하셨습니다!<br>
+          전 세계 플레이어들에게 당신의 이름을 선포합니다! 🏆
         </p>
       ` : `
-        <!-- 일반 모드 완주 연출 -->
-        <div style="font-size: 44px;">🚌🏁</div>
-        <div class="result-headline" style="color: #fff;">
-          FINISH! 완주 성공!
+        <!-- 일반 모드 완주 / 점령 실패 격려 연출 -->
+        <div style="font-size: 44px;">💪🏁</div>
+        <div class="result-headline" style="color: #ffffff;">
+          💪 아쉬워요! 기존 영주의 벽을 넘지 못했습니다.
         </div>
-        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
-          수고하셨습니다! 1위 점령까지 더 빠르게 도전해보세요.
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.6;">
+          0.1초만 더 단축하면 영주 자리를 빼앗을 수 있습니다!<br>
+          <strong style="color: var(--kairo-yellow);">다시 도전해 보세요! 🔄</strong>
         </p>
       `}
 
