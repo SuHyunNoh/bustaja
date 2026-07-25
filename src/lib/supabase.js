@@ -23,6 +23,16 @@ export function getSupabase() {
   return supabaseClient;
 }
 
+// 닉네임별 최고기록(best_ms 최소)만 남기고 best_ms 오름차순 정렬 → 고유 도전자 리스트
+function dedupByNickname(rows) {
+  const bestByNick = {};
+  for (const item of rows) {
+    const n = item.nickname;
+    if (!bestByNick[n] || item.best_ms < bestByNick[n].best_ms) bestByNick[n] = item;
+  }
+  return Object.values(bestByNick).sort((a, b) => a.best_ms - b.best_ms);
+}
+
 // 1. Supabase DB에서 특정 노선 1위 영주 및 TOP 랭킹 Direct SELECT 쿼리
 export async function fetchBoardDirectFromSupabase(routeId, diffKey = "easy") {
   const boardId = `${routeId}__${diffKey}`;
@@ -31,7 +41,7 @@ export async function fetchBoardDirectFromSupabase(routeId, diffKey = "easy") {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000);
-    const url = `${SUPABASE_URL}/rest/v1/scores?board_id=eq.${boardId}&order=best_ms.asc&limit=10`;
+    const url = `${SUPABASE_URL}/rest/v1/scores?board_id=eq.${boardId}&order=best_ms.asc&limit=200`;
 
     const res = await fetch(url, {
       method: "GET",
@@ -48,7 +58,9 @@ export async function fetchBoardDirectFromSupabase(routeId, diffKey = "easy") {
     if (res && res.ok) {
       const dataList = await res.json();
       if (Array.isArray(dataList) && dataList.length > 0) {
-        const top = dataList[0];
+        // 닉네임별 최고기록만 남겨 중복 제거 → 고유 도전자 수 + 깔끔한 랭킹
+        const unique = dedupByNickname(dataList);
+        const top = unique[0];
         return {
           routeId,
           difficulty: diffKey,
@@ -56,8 +68,8 @@ export async function fetchBoardDirectFromSupabase(routeId, diffKey = "easy") {
           bestMs: top.best_ms,
           bestSplits: top.splits || [],
           occupiedSince: top.created_at || new Date().toISOString(),
-          challengerCount: dataList.length,
-          scores: dataList.map((item, idx) => ({
+          challengerCount: unique.length,
+          scores: unique.slice(0, 10).map((item, idx) => ({
             rank: idx + 1,
             nickname: item.nickname,
             bestMs: item.best_ms,
@@ -82,7 +94,8 @@ export async function fetchBoardDirectFromSupabase(routeId, diffKey = "easy") {
         .limit(10);
 
       if (!error && Array.isArray(data) && data.length > 0) {
-        const top = data[0];
+        const unique = dedupByNickname(data);
+        const top = unique[0];
         return {
           routeId,
           difficulty: diffKey,
@@ -90,8 +103,8 @@ export async function fetchBoardDirectFromSupabase(routeId, diffKey = "easy") {
           bestMs: top.best_ms,
           bestSplits: top.splits || [],
           occupiedSince: top.created_at || new Date().toISOString(),
-          challengerCount: data.length,
-          scores: data.map((item, idx) => ({
+          challengerCount: unique.length,
+          scores: unique.slice(0, 10).map((item, idx) => ({
             rank: idx + 1,
             nickname: item.nickname,
             bestMs: item.best_ms,
