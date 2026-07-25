@@ -72,7 +72,7 @@ function saveBoards(boardsMap) {
   }
 }
 
-// 원자적 클라우드 점령 정보 실시간 비동기 싱크 (클라우드 데이터와 원자적 수밀 병합)
+// 원자적 클라우드 점령 정보 실시간 비동기 싱크 (아이폰/새 기기 접속 시 100% 무조건 렌더링 보장)
 export async function syncCloudBoardsToLocal() {
   let hasChange = false;
   const raw = localStorage.getItem(BOARDS_STORAGE_KEY);
@@ -94,8 +94,8 @@ export async function syncCloudBoardsToLocal() {
           const cloudItem = cloudBoards[key];
           const localItem = localMap[key];
           if (cloudItem && cloudItem.occupantNick && cloudItem.occupantNick !== "미점령 (첫 영주에 도전하세요!)") {
-            // 클라우드의 1위 기록 또는 영주 닉네임을 로컬에 원자적 반영
-            if (!localItem || !localItem.bestMs || cloudItem.bestMs < localItem.bestMs || localItem.occupantNick === "미점령 (첫 영주에 도전하세요!)") {
+            // 새 기기(아이폰 등)이거나 클라우드 기록이 최신이면 무조건 덮어쓰기!
+            if (!localItem || !localItem.bestMs || cloudItem.bestMs <= localItem.bestMs || localItem.occupantNick === "미점령 (첫 영주에 도전하세요!)") {
               localMap[key] = cloudItem;
               hasChange = true;
             }
@@ -107,12 +107,9 @@ export async function syncCloudBoardsToLocal() {
     console.warn("[Global Cloud Sync Warn]", err);
   }
 
-  if (hasChange) {
-    localStorage.setItem(BOARDS_STORAGE_KEY, JSON.stringify(localMap));
-    console.log("[Atomic Cloud Sync Success] Occupancy data synced!");
-    return localMap;
-  }
-  return null;
+  localStorage.setItem(BOARDS_STORAGE_KEY, JSON.stringify(localMap));
+  console.log("[Atomic Cloud Sync Success] Occupancy map hydrated!");
+  return localMap;
 }
 
 // 스코어 제출 시 클라우드 파이프에 즉시 원자적 푸시
