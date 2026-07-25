@@ -4,7 +4,7 @@
 // ==========================================================================
 
 import { LOCAL_ROUTES } from "../data/routes.js";
-import { submitScoreToSupabase, fetchAllBoardsFromSupabase, fetchBoardFromSupabase } from "./supabase.js";
+import { submitScoreToSupabase, fetchAllBoardsFromSupabase, fetchBoardFromSupabase, fetchBoardDirectFromSupabase } from "./supabase.js";
 
 const BOARDS_STORAGE_KEY = "busstop_boards_v2";
 const CHALLENGES_STORAGE_KEY = "busstop_challenges_v2";
@@ -290,8 +290,6 @@ export function getBoardByRouteAndDiff(routeId, diffKey = "easy") {
     diffSpec
   };
 }
-
-import { fetchBoardDirectFromSupabase } from "./supabase.js";
 
 // 노선 x 난이도별 점령자 & 랭킹 조회 (Supabase DB 100% 직통 쿼리 비동기)
 export async function getBoardByRouteAndDiffAsync(routeId, diffKey = "easy") {
