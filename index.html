@@ -40,13 +40,13 @@
   <link rel="stylesheet" href="./src/styles/pixel.css">
   <link rel="stylesheet" href="./src/styles/main.css">
 
-  <!-- Supabase Config Key -->
+  <!-- Supabase Config Key & Async Non-blocking SDK -->
   <script>
     window.SUPABASE_URL = "https://wnvioqmkyymvmahecjye.supabase.co";
     window.SUPABASE_ANON_KEY = "sb_publishable_knih9nw6Vw9BoSLDGCCgbw_1UhxuEu2";
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js"></script>
 
   <style>
     .seo-static-article {
@@ -73,8 +73,8 @@
   <!-- 메인 앱 컨테이너 -->
   <main id="app-container" aria-label="버스타자 앱 메인"></main>
 
-  <!-- 메인 애플리케이션 모듈 로드 (Defensive Boundary v3.0.9) -->
-  <script type="module" src="./src/main.js?v=3.0.9"></script>
+  <!-- 메인 애플리케이션 모듈 로드 (Guaranteed Launch v3.1.0) -->
+  <script type="module" src="./src/main.js?v=3.1.0"></script>
 
 </body>
 </html>
