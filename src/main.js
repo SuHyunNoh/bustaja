@@ -24,6 +24,9 @@ import { renderChallengeEntryScreen } from "./screens/ChallengeEntryScreen.js";
 class App {
   constructor() {
     this.appContainer = document.getElementById("app-container");
+    if (this.appContainer) {
+      this.appContainer.innerHTML = "";
+    }
     this.headerSlot = document.createElement("div");
     this.screenSlot = document.createElement("div");
     this.screenSlot.className = "screen-container-wrapper";
